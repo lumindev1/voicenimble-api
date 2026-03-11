@@ -34,11 +34,11 @@ export class AnalyticsController {
         { $group: { _id: null, avg: { $avg: '$duration' } } },
       ]);
 
-      // Campaign overview: successful = completed, failed = failed, others = transferred+no-answer+busy
+      // Campaign overview: successful = completed, failed = failed+busy+no-answer+canceled, others = transferred
       const [successCalls, failedCalls, otherCalls] = await Promise.all([
         Call.countDocuments({ shopId, status: 'completed' }),
-        Call.countDocuments({ shopId, status: 'failed' }),
-        Call.countDocuments({ shopId, status: { $in: ['transferred', 'no-answer', 'busy'] } }),
+        Call.countDocuments({ shopId, status: { $in: ['failed', 'busy', 'no-answer', 'canceled'] } }),
+        Call.countDocuments({ shopId, status: 'transferred' }),
       ]);
 
       res.json({

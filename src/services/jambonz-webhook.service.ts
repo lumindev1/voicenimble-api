@@ -171,8 +171,8 @@ export class JambonzWebhookService {
       }
     }
 
-    // Default: TTS greeting + gather for AI conversation
-    const recognizerLang = agent.primaryLanguage || 'en-US';
+    // Default: TTS greeting then gather
+    const recognizerLang = agent.primaryLanguage || 'bn-BD';
     jcml.push(
       this.jambonz.buildSayVerb(greeting, agent.voiceId, 'google', agent.voiceSpeed),
       this.jambonz.buildGatherVerb(gatherUrl, [], 8, recognizerLang),
@@ -190,7 +190,7 @@ export class JambonzWebhookService {
     if (!userInput.trim()) {
       const state = await this.aiService.getConversationState(call_sid);
       const agent = state ? await Agent.findById(state.agentId) : null;
-      const lang = agent?.primaryLanguage || 'en-US';
+      const lang = agent?.primaryLanguage || 'bn-BD';
       const gatherUrl = `${process.env.APP_URL}/jambonz/gather-result?callSid=${call_sid}`;
       return [
         this.jambonz.buildSayVerb('আমি বুঝতে পারিনি, অনুগ্রহ করে আবার বলুন।', agent?.voiceId || 'bn-IN-Wavenet-A', 'google', agent?.voiceSpeed),
@@ -247,8 +247,8 @@ export class JambonzWebhookService {
       ];
     }
 
-    // Continue conversation — speak AI response then gather next user input
-    const lang = agent?.primaryLanguage || 'en-US';
+    // Continue conversation
+    const lang = agent?.primaryLanguage || 'bn-BD';
     const gatherUrl = `${process.env.APP_URL}/jambonz/gather-result?callSid=${call_sid}`;
     return [
       this.jambonz.buildSayVerb(aiResponse.text, agent?.voiceId, 'google', agent?.voiceSpeed),
@@ -257,11 +257,11 @@ export class JambonzWebhookService {
   }
 
   async handleCallStatus(payload: JambonzCallPayload): Promise<void> {
-    const { call_sid, call_status, duration } = payload;
-    logger.info(`Call status update [${call_sid}]: ${call_status}, duration: ${duration}s`);
+    const { call_sid, call_status, duration, to, from } = payload;
+    logger.info(`Call status update [${call_sid}]: ${call_status}, duration: ${duration}s, from: ${from}, to: ${to}`);
 
-    if (call_status === 'completed' || call_status === 'failed' || call_status === 'no-answer') {
-      const call = await Call.findOneAndUpdate(
+    if (call_status === 'completed' || call_status === 'failed' || call_status === 'no-answer' || call_status === 'busy' || call_status === 'canceled') {
+      let call = await Call.findOneAndUpdate(
         { callSid: call_sid },
         {
           status: call_status as ICall['status'],
@@ -271,6 +271,31 @@ export class JambonzWebhookService {
         },
         { new: true },
       );
+
+      // Call record missing — happens when declined/busy before call_hook fires.
+      // Create a minimal record so it appears in history and analytics.
+      if (!call && (call_status === 'busy' || call_status === 'no-answer' || call_status === 'failed' || call_status === 'canceled')) {
+        const agent = await Agent.findOne({ isActive: true });
+        if (agent) {
+          const shop = await Shop.findById(agent.shopId);
+          if (shop) {
+            call = await Call.create({
+              shopId: agent.shopId,
+              shopDomain: shop.shopDomain,
+              agentId: agent._id,
+              callSid: call_sid,
+              direction: 'outbound',
+              status: call_status as ICall['status'],
+              callerNumber: from || '',
+              calledNumber: to || '',
+              duration: 0,
+              startedAt: new Date(),
+              endedAt: new Date(),
+            });
+            logger.info(`Created missed call record for ${call_sid} (${call_status})`);
+          }
+        }
+      }
 
       if (!call) return;
 

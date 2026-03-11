@@ -65,13 +65,22 @@
       "Bash(lsof -ti :5173)",
       "Bash(lsof -i :3000 -t)",
       "Bash(lsof -i :3001 -t)",
-      "Bash(npm run dev)"
+      "Bash(npm run dev)",
+      "Bash(git push origin main)",
+      "Read(//Users/luminouslabs/.ssh/**)",
+      "Bash(ssh -T git@github.com)",
+      "Bash(ssh-keygen -t ed25519 -C \"lumindev1\" -f ~/.ssh/id_ed25519_lumindev1 -N \"\")",
+      "Bash(git remote set-url origin git@github-lumindev1:lumindev1/voicenimble-api.git)",
+      "Bash(npm -v)",
+      "Bash(ngrok version:*)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data[''''tunnels''''][0][''''public_url'''']\\)\")"
     ],
     "additionalDirectories": [
       "/Users/luminouslabs/Desktop/project/voice-nimble/api/src",
       "/Users/luminouslabs/Desktop/project/voice-nimble/app",
       "/Users/luminouslabs/Desktop/project/voice-nimble",
-      "/Users/luminouslabs/Desktop/project/voice-nimble/api"
+      "/Users/luminouslabs/Desktop/project/voice-nimble/api",
+      "/Users/luminouslabs/.ssh"
     ]
   }
 }

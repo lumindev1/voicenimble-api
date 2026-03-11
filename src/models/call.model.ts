@@ -8,6 +8,7 @@ export type CallStatus =
   | 'failed'
   | 'no-answer'
   | 'busy'
+  | 'canceled'
   | 'transferred';
 
 export type CallSentiment = 'positive' | 'neutral' | 'negative' | 'unknown';
@@ -70,7 +71,7 @@ const callSchema = new Schema<ICall>(
     direction: { type: String, enum: ['inbound', 'outbound'], default: 'inbound' },
     status: {
       type: String,
-      enum: ['initiated', 'ringing', 'in-progress', 'completed', 'failed', 'no-answer', 'busy', 'transferred'],
+      enum: ['initiated', 'ringing', 'in-progress', 'completed', 'failed', 'no-answer', 'busy', 'canceled', 'transferred'],
       default: 'initiated',
       index: true,
     },
