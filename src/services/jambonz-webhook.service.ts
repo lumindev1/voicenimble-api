@@ -140,13 +140,26 @@ export class JambonzWebhookService {
 
     logger.info(`Call record created: ${call._id}, direction: ${direction}`);
 
-    // Initialize AI conversation (with optional template context)
+    // Extract event-driven context from tag
+    const eventType = tagData.eventType;
+    let orderContext: Record<string, unknown> | undefined;
+    if (tagData.orderContext) {
+      try {
+        orderContext = typeof tagData.orderContext === 'string'
+          ? JSON.parse(tagData.orderContext)
+          : tagData.orderContext;
+      } catch { /* ignore parse errors */ }
+    }
+
+    // Initialize AI conversation (with optional template and event context)
     await this.aiService.initializeConversation(
       call_sid,
       shop.shopDomain,
       agent._id.toString(),
       shop.accessToken,
       templateText,
+      eventType,
+      orderContext as Record<string, unknown> | undefined,
     );
 
     // Build JCML response

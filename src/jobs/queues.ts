@@ -18,3 +18,4 @@ export const analyticsQueue = new Queue('analytics', getBullMQConnection());
 export const emailQueue = new Queue('email', getBullMQConnection());
 export const reportQueue = new Queue('report', getBullMQConnection());
 export const broadcastQueue = new Queue('broadcast', getBullMQConnection());
+export const eventDrivenQueue = new Queue('event-driven', getBullMQConnection());

@@ -73,7 +73,13 @@
       "Bash(git remote set-url origin git@github-lumindev1:lumindev1/voicenimble-api.git)",
       "Bash(npm -v)",
       "Bash(ngrok version:*)",
-      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data[''''tunnels''''][0][''''public_url'''']\\)\")"
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data[''''tunnels''''][0][''''public_url'''']\\)\")",
+      "Bash(npx ts-node-dev:*)",
+      "Bash(python3 -c \"import sys,json; tunnels=json.load\\(sys.stdin\\)[''''tunnels'''']; [print\\(f''''{t[\"\"public_url\"\"]} → {t[\"\"config\"\"][\"\"addr\"\"]}''''\\) for t in tunnels]\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f''''Username: {d.get\\(\"\"register_username\"\"\\)}\\\\nStatus: {json.dumps\\(d.get\\(\"\"register_status\"\"\\)\\)}''''\\)\")",
+      "Bash(nc -z -w 5 178.128.94.119 5160)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\)[0]; print\\(''''Registration:'''', json.dumps\\(d[''''register_status''''], indent=2\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f''''Status: {d[\"\"call_status\"\"]}, SIP: {d[\"\"sip_status\"\"]} {d[\"\"sip_reason\"\"]}, Duration: {d.get\\(\"\"duration\"\",\"\"N/A\"\"\\)}''''\\)\")"
     ],
     "additionalDirectories": [
       "/Users/luminouslabs/Desktop/project/voice-nimble/api/src",

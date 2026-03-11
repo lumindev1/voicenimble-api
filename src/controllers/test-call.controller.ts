@@ -3,6 +3,7 @@ import axios from 'axios';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import Agent from '../models/agent.model';
 import CallTemplate from '../models/call-template.model';
+import SipTrunk from '../models/sip-trunk.model';
 import { AppError } from '../middlewares/error.middleware';
 
 export class TestCallController {
@@ -26,7 +27,10 @@ export class TestCallController {
       const accountSid = process.env.JAMBONZ_ACCOUNT_SID!;
       const appUrl = process.env.APP_URL!;
 
-      const from = fromNumber || agent.byonPhoneNumber || agent.phoneNumber || process.env.DEFAULT_FROM_NUMBER || '';
+      // Look up merchant's default SIP trunk for caller ID and routing
+      const sipTrunk = await SipTrunk.findOne({ shopId: req.shopId, isDefault: true, isActive: true });
+
+      const from = fromNumber || sipTrunk?.callerIdNumber || agent.byonPhoneNumber || agent.phoneNumber || process.env.DEFAULT_FROM_NUMBER || '';
 
       const tag = {
         agentId: agent._id.toString(),
@@ -36,19 +40,26 @@ export class TestCallController {
         ...(template ? { templateId: template._id.toString() } : {}),
       };
 
+      const callPayload: Record<string, unknown> = {
+        application_sid: process.env.JAMBONZ_APPLICATION_SID || '7087fe50-8acb-4f3b-b820-97b573723aab',
+        from,
+        to: { type: 'phone', number: to },
+        tag,
+        call_hook: {
+          url: `${appUrl}/jambonz/call-event`,
+          method: 'POST',
+        },
+        call_status_hook: { url: `${appUrl}/jambonz/call-status`, method: 'POST' },
+      };
+
+      // Route through merchant's SIP trunk if configured
+      if (sipTrunk?.jambonzCarrierSid) {
+        callPayload.sip_trunk = sipTrunk.jambonzCarrierSid;
+      }
+
       const response = await axios.post(
         `${baseUrl}/v1/Accounts/${accountSid}/Calls`,
-        {
-          application_sid: process.env.JAMBONZ_APPLICATION_SID || '7087fe50-8acb-4f3b-b820-97b573723aab',
-          from,
-          to: { type: 'phone', number: to },
-          tag,
-          call_hook: {
-            url: `${appUrl}/jambonz/call-event`,
-            method: 'POST',
-          },
-          call_status_hook: { url: `${appUrl}/jambonz/call-status`, method: 'POST' },
-        },
+        callPayload,
         { headers: { Authorization: `Bearer ${apiKey}` } },
       );
 

@@ -5,7 +5,10 @@ import Call from '../models/call.model';
 import Broadcast from '../models/broadcast.model';
 import Contact from '../models/contact.model';
 import Agent from '../models/agent.model';
+import Shop from '../models/shop.model';
 import CallTemplate from '../models/call-template.model';
+import EventDriven from '../models/event-driven.model';
+import SipTrunk from '../models/sip-trunk.model';
 import { EmailService } from '../services/email.service';
 import logger from '../utils/logger';
 
@@ -99,7 +102,10 @@ async function processBroadcastJob(job: Job): Promise<void> {
   const apiKey = process.env.JAMBONZ_API_KEY!;
   const accountSid = process.env.JAMBONZ_ACCOUNT_SID!;
   const appUrl = process.env.APP_URL!;
-  const from = agent.byonPhoneNumber || agent.phoneNumber || process.env.DEFAULT_FROM_NUMBER || '';
+
+  // Look up merchant's SIP trunk
+  const sipTrunk = await SipTrunk.findOne({ shopId: broadcast.shopId, isDefault: true, isActive: true });
+  const from = sipTrunk?.callerIdNumber || agent.byonPhoneNumber || agent.phoneNumber || process.env.DEFAULT_FROM_NUMBER || '';
 
   for (const contact of contacts) {
     // Re-check cancellation between calls
@@ -116,16 +122,22 @@ async function processBroadcastJob(job: Job): Promise<void> {
         ...(template ? { templateId: template._id.toString() } : {}),
       };
 
+      const callPayload: Record<string, unknown> = {
+        application_sid: process.env.JAMBONZ_APPLICATION_SID,
+        from,
+        to: { type: 'phone', number: contact.phone },
+        tag,
+        call_hook: { url: `${appUrl}/jambonz/call-event`, method: 'POST' },
+        call_status_hook: { url: `${appUrl}/jambonz/call-status`, method: 'POST' },
+      };
+
+      if (sipTrunk?.jambonzCarrierSid) {
+        callPayload.sip_trunk = sipTrunk.jambonzCarrierSid;
+      }
+
       await axios.post(
         `${baseUrl}/v1/Accounts/${accountSid}/Calls`,
-        {
-          application_sid: process.env.JAMBONZ_APPLICATION_SID,
-          from,
-          to: { type: 'phone', number: contact.phone },
-          tag,
-          call_hook: { url: `${appUrl}/jambonz/call-event`, method: 'POST' },
-          call_status_hook: { url: `${appUrl}/jambonz/call-status`, method: 'POST' },
-        },
+        callPayload,
         { headers: { Authorization: `Bearer ${apiKey}` } },
       );
 
@@ -154,6 +166,80 @@ async function processBroadcastJob(job: Job): Promise<void> {
   logger.info(`Broadcast ${broadcastId} completed`);
 }
 
+async function processEventDrivenJob(job: Job): Promise<void> {
+  const {
+    shopId, shopDomain, configId, agentId, templateId,
+    fromNumber, customerPhone, eventType, orderContext,
+  } = job.data as {
+    shopId: string;
+    shopDomain: string;
+    configId: string;
+    agentId?: string;
+    templateId: string;
+    fromNumber?: string;
+    customerPhone: string;
+    eventType: string;
+    orderContext: Record<string, unknown>;
+  };
+
+  // Load agent: use config's agentId or fall back to shop's active agent
+  const agent = agentId
+    ? await Agent.findById(agentId)
+    : await Agent.findOne({ shopId, isActive: true });
+
+  if (!agent) {
+    logger.error(`Event-driven job ${job.id}: no agent found for shop ${shopDomain}`);
+    return;
+  }
+
+  const template = await CallTemplate.findById(templateId);
+
+  const baseUrl = process.env.JAMBONZ_BASE_URL!;
+  const apiKey = process.env.JAMBONZ_API_KEY!;
+  const accountSid = process.env.JAMBONZ_ACCOUNT_SID!;
+  const appUrl = process.env.APP_URL!;
+
+  // Look up merchant's SIP trunk
+  const sipTrunk = await SipTrunk.findOne({ shopId, isDefault: true, isActive: true });
+  const from = fromNumber || sipTrunk?.callerIdNumber || agent.byonPhoneNumber || agent.phoneNumber || process.env.DEFAULT_FROM_NUMBER || '';
+
+  const tag = {
+    agentId: agent._id.toString(),
+    shopDomain,
+    direction: 'outbound',
+    callType: 'event_driven',
+    eventType,
+    configId,
+    ...(template ? { templateId: template._id.toString() } : {}),
+    orderContext: JSON.stringify(orderContext),
+  };
+
+  try {
+    const callPayload: Record<string, unknown> = {
+      application_sid: process.env.JAMBONZ_APPLICATION_SID,
+      from,
+      to: { type: 'phone', number: customerPhone },
+      tag,
+      call_hook: { url: `${appUrl}/jambonz/call-event`, method: 'POST' },
+      call_status_hook: { url: `${appUrl}/jambonz/call-status`, method: 'POST' },
+    };
+
+    if (sipTrunk?.jambonzCarrierSid) {
+      callPayload.sip_trunk = sipTrunk.jambonzCarrierSid;
+    }
+
+    await axios.post(
+      `${baseUrl}/v1/Accounts/${accountSid}/Calls`,
+      callPayload,
+      { headers: { Authorization: `Bearer ${apiKey}` } },
+    );
+
+    logger.info(`Event-driven call initiated: ${eventType} → ${customerPhone} (order: ${(orderContext as { orderName?: string }).orderName || 'N/A'})`);
+  } catch (err) {
+    logger.error(`Event-driven call failed for ${customerPhone}:`, err);
+  }
+}
+
 function getBullMQConnection() {
   const url = process.env.REDIS_URL || 'redis://localhost:6379';
   const parsed = new URL(url);
@@ -173,6 +259,7 @@ export async function startWorkers(): Promise<void> {
   const analyticsWorker = new Worker('analytics', processAnalyticsJob, connection);
   const emailWorker = new Worker('email', processEmailJob, connection);
   const broadcastWorker = new Worker('broadcast', processBroadcastJob, connection);
+  const eventDrivenWorker = new Worker('event-driven', processEventDrivenJob, connection);
 
   analyticsWorker.on('completed', (job) => {
     logger.info(`Analytics job ${job.id} completed`);
@@ -196,6 +283,14 @@ export async function startWorkers(): Promise<void> {
 
   broadcastWorker.on('failed', (job, err) => {
     logger.error(`Broadcast job ${job?.id} failed:`, err);
+  });
+
+  eventDrivenWorker.on('completed', (job) => {
+    logger.info(`Event-driven job ${job.id} completed`);
+  });
+
+  eventDrivenWorker.on('failed', (job, err) => {
+    logger.error(`Event-driven job ${job?.id} failed:`, err);
   });
 
   // Poll for scheduled broadcasts every 30 seconds
@@ -223,5 +318,5 @@ export async function startWorkers(): Promise<void> {
     }
   }, 30000);
 
-  logger.info('BullMQ workers started: analytics, email, broadcast');
+  logger.info('BullMQ workers started: analytics, email, broadcast, event-driven');
 }

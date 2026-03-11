@@ -79,26 +79,30 @@ export class CallController {
       const apiKey = process.env.JAMBONZ_API_KEY!;
       const accountSid = process.env.JAMBONZ_ACCOUNT_SID!;
       const appUrl = process.env.APP_URL!;
-      const fromNumber = from || agent.byonPhoneNumber || agent.phoneNumber || '01521206630';
+      const fromNumber = from || agent.byonPhoneNumber || agent.phoneNumber || process.env.DEFAULT_FROM_NUMBER || '01521206630';
+
+      const tag = {
+        agentId: agent._id.toString(),
+        shopDomain: agent.shopDomain,
+        direction: 'outbound',
+        callType: 'outbound',
+      };
 
       const response = await axios.post(
         `${baseUrl}/v1/Accounts/${accountSid}/Calls`,
         {
+          application_sid: process.env.JAMBONZ_APPLICATION_SID || '7087fe50-8acb-4f3b-b820-97b573723aab',
           from: fromNumber,
           to: { type: 'phone', number: to },
+          tag,
           call_hook: {
-            url: `${appUrl}/jambonz/call-event?agentId=${agent._id}&shopDomain=${agent.shopDomain}&direction=outbound`,
+            url: `${appUrl}/jambonz/call-event`,
             method: 'POST',
           },
           call_status_hook: {
             url: `${appUrl}/jambonz/call-status`,
             method: 'POST',
           },
-          speech_synthesis_vendor: 'google',
-          speech_synthesis_language: 'en-US',
-          speech_synthesis_voice: 'en-US-Wavenet-C',
-          speech_recognizer_vendor: 'google',
-          speech_recognizer_language: 'en-US',
         },
         { headers: { Authorization: `Bearer ${apiKey}` } },
       );

@@ -23,6 +23,7 @@ import knowledgeBaseRoutes from './routes/knowledge-base.routes';
 import broadcastRoutes from './routes/broadcast.routes';
 import eventDrivenRoutes from './routes/event-driven.routes';
 import testCallRoutes from './routes/test-call.routes';
+import sipTrunkRoutes from './routes/sip-trunk.routes';
 
 import { errorHandler } from './middlewares/error.middleware';
 import logger from './utils/logger';
@@ -101,6 +102,7 @@ app.use('/api/knowledge-base', knowledgeBaseRoutes);
 app.use('/api/broadcast', broadcastRoutes);
 app.use('/api/event-driven', eventDrivenRoutes);
 app.use('/api/test-call', testCallRoutes);
+app.use('/api/sip-trunks', sipTrunkRoutes);
 app.use('/webhooks', webhookRoutes);
 app.use('/jambonz', jambonzRoutes);
 

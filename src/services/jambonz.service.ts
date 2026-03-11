@@ -126,6 +126,56 @@ export class JambonzService {
     );
   }
 
+  // ---- SIP Trunk / Carrier Management ----
+
+  async createCarrier(name: string, description?: string): Promise<string> {
+    const res = await this.client.post('/v1/VoipCarriers', {
+      name,
+      description: description || '',
+      account_sid: this.accountSid,
+    });
+    return res.data.sid;
+  }
+
+  async deleteCarrier(carrierSid: string): Promise<void> {
+    await this.client.delete(`/v1/VoipCarriers/${carrierSid}`);
+  }
+
+  async createSipGateway(
+    carrierSid: string,
+    sipHost: string,
+    sipPort: number,
+    protocol: 'udp' | 'tcp' | 'tls' = 'udp',
+  ): Promise<string> {
+    const res = await this.client.post('/v1/SipGateways', {
+      voip_carrier_sid: carrierSid,
+      ipv4: sipHost,
+      port: sipPort,
+      protocol,
+      is_active: true,
+      outbound: true,
+      inbound: true,
+    });
+    return res.data.sid;
+  }
+
+  async deleteSipGateway(gatewaySid: string): Promise<void> {
+    await this.client.delete(`/v1/SipGateways/${gatewaySid}`);
+  }
+
+  async updateSipGateway(
+    gatewaySid: string,
+    sipHost: string,
+    sipPort: number,
+    protocol: 'udp' | 'tcp' | 'tls' = 'udp',
+  ): Promise<void> {
+    await this.client.put(`/v1/SipGateways/${gatewaySid}`, {
+      ipv4: sipHost,
+      port: sipPort,
+      protocol,
+    });
+  }
+
   // Build Jambonz JCML (call control JSON) for saying something via TTS
   buildSayVerb(
     text: string,

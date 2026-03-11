@@ -3,12 +3,24 @@ import { ShopifyService } from './shopify.service';
 import Agent from '../models/agent.model';
 import Shop from '../models/shop.model';
 import SkillsConfig from '../models/skills-config.model';
+import KnowledgeBase from '../models/knowledge-base.model';
 import { getRedisClient } from '../config/redis';
 import logger from '../utils/logger';
 
 interface ConversationMessage {
   role: 'user' | 'assistant';
   content: string;
+}
+
+interface OrderContext {
+  orderName?: string;
+  customerName?: string;
+  customerPhone?: string;
+  items?: Array<{ title: string; quantity: number; price: string }>;
+  totalPrice?: string;
+  currency?: string;
+  shippingAddress?: string;
+  fulfillmentStatus?: string;
 }
 
 interface ConversationState {
@@ -24,6 +36,8 @@ interface ConversationState {
   endCallRequested?: boolean;
   accessToken: string;
   templateText?: string;
+  eventType?: string;
+  orderContext?: OrderContext;
 }
 
 interface AIResponse {
@@ -46,6 +60,8 @@ export class AIConversationService {
     agentId: string,
     accessToken: string,
     templateText?: string,
+    eventType?: string,
+    orderContext?: OrderContext,
   ): Promise<void> {
     const state: ConversationState = {
       shopDomain,
@@ -55,6 +71,8 @@ export class AIConversationService {
       collectedInfo: {},
       accessToken,
       templateText,
+      eventType,
+      orderContext,
     };
     const redis = getRedisClient();
     await redis.setex(`conversation:${callSid}`, this.conversationTTL, JSON.stringify(state));
@@ -152,10 +170,32 @@ export class AIConversationService {
       ? `\nCALL SCRIPT / TEMPLATE:\n${state.templateText}\n`
       : '';
 
+    // Build order context section for event-driven calls
+    let orderSection = '';
+    if (state.orderContext) {
+      const oc = state.orderContext;
+      const itemsList = oc.items?.map(i => `${i.title} (x${i.quantity}) - ${oc.currency || '৳'}${i.price}`).join(', ') || '';
+      const eventLabel = state.eventType === 'order_fulfilled' ? 'অর্ডার ডেলিভারি হয়েছে' : 'নতুন অর্ডার';
+      orderSection = `
+CALL CONTEXT (EVENT-DRIVEN):
+This is an automated call triggered by: ${eventLabel}
+Order Number: ${oc.orderName || 'N/A'}
+Customer Name: ${oc.customerName || 'N/A'}
+Items: ${itemsList || 'N/A'}
+Total: ${oc.currency || '৳'}${oc.totalPrice || 'N/A'}
+${oc.shippingAddress ? `Shipping Address: ${oc.shippingAddress}` : ''}
+${state.eventType === 'order_placed' ? 'Your goal: Call the customer, confirm the order details, verify the delivery address, and answer any questions about the order.' : ''}
+${state.eventType === 'order_fulfilled' ? 'Your goal: Inform the customer that their order has been shipped/delivered and ask if they have any questions.' : ''}
+`;
+    }
+
+    // Build knowledge base section
+    const kbSection = await this.getKnowledgeBaseContent(shop._id.toString());
+
     return `You are ${agent.agentName}, an AI voice assistant for ${shop.shopName}.
 
 YOUR ROLE: ${agent.agentRole}
-${templateSection}
+${templateSection}${orderSection}${kbSection}
 BUSINESS INFORMATION:
 ${shopContext}
 
@@ -187,6 +227,35 @@ RULES:
 3. If customer frustrated after 2 attempts: offer human transfer.
 4. Keep all responses SHORT — phone conversation only.
 5. Current collected info: ${JSON.stringify(state.collectedInfo)}`;
+  }
+
+  private async getKnowledgeBaseContent(shopId: string): Promise<string> {
+    const redis = getRedisClient();
+    const cacheKey = `kb:${shopId}`;
+    const cached = await redis.get(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const knowledgeBases = await KnowledgeBase.find({ shopId });
+      if (!knowledgeBases.length) return '';
+
+      const docs = knowledgeBases.flatMap(kb => kb.documents || []);
+      if (!docs.length) return '';
+
+      const content = docs
+        .filter(d => d.content)
+        .map(d => `### ${d.title}\n${d.content}`)
+        .join('\n\n');
+
+      if (!content) return '';
+
+      const section = `\nBUSINESS KNOWLEDGE BASE:\nUse this information to answer customer questions accurately:\n${content}\n`;
+      await redis.setex(cacheKey, 300, section); // 5 min cache
+      return section;
+    } catch (err) {
+      logger.error('Failed to load knowledge base:', err);
+      return '';
+    }
   }
 
   private async getShopContext(shopDomain: string, accessToken: string): Promise<string> {
