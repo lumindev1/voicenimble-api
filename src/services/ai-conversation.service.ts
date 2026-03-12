@@ -98,7 +98,7 @@ export class AIConversationService {
   async processUserInput(callSid: string, userInput: string): Promise<AIResponse> {
     const state = await this.getConversationState(callSid);
     if (!state) {
-      return { text: 'দুঃখিত, আমাদের কথোপকথন হারিয়ে গেছে। অনুগ্রহ করে আবার কল করুন।' };
+      return { text: 'Sorry, our conversation was lost. Please call again.' };
     }
 
     state.messages.push({ role: 'user', content: userInput });
@@ -119,7 +119,7 @@ export class AIConversationService {
       responseText = response.choices[0]?.message?.content || '';
     } catch (err) {
       logger.error('OpenAI API error:', err);
-      responseText = 'দুঃখিত, আপনার অনুরোধ প্রক্রিয়া করতে সমস্যা হচ্ছে। আমি আপনাকে একজন দলের সদস্যের কাছে ট্রান্সফার করছি।';
+      responseText = 'Sorry, there was an issue processing your request. Let me transfer you to a team member.';
       state.transferRequested = true;
     }
 
@@ -146,9 +146,9 @@ export class AIConversationService {
 
   async getGreeting(callSid: string): Promise<string> {
     const state = await this.getConversationState(callSid);
-    if (!state) return 'আসসালামু আলাইকুম! আজ আমি আপনাকে কিভাবে সাহায্য করতে পারি?';
+    if (!state) return 'Hello! How can I help you today?';
     const agent = await Agent.findById(state.agentId);
-    if (!agent) return 'আসসালামু আলাইকুম! আজ আমি আপনাকে কিভাবে সাহায্য করতে পারি?';
+    if (!agent) return 'Hello! How can I help you today?';
     return agent.greetingMessage;
   }
 
@@ -160,7 +160,7 @@ export class AIConversationService {
     ]);
 
     if (!agent || !shop) {
-      return 'You are a helpful customer service agent. This is a phone call — keep every response under 50 words. Be concise and natural. ALWAYS respond in Bangla (Bengali) language.';
+      return 'You are a helpful customer service agent. This is a phone call — keep every response under 50 words. Be concise and natural. ALWAYS respond in English.';
     }
 
     const enabledSkills = skillsConfig?.skills.filter((s) => s.isEnabled).map((s) => s.name) || [];
@@ -174,15 +174,15 @@ export class AIConversationService {
     let orderSection = '';
     if (state.orderContext) {
       const oc = state.orderContext;
-      const itemsList = oc.items?.map(i => `${i.title} (x${i.quantity}) - ${oc.currency || '৳'}${i.price}`).join(', ') || '';
-      const eventLabel = state.eventType === 'order_fulfilled' ? 'অর্ডার ডেলিভারি হয়েছে' : 'নতুন অর্ডার';
+      const itemsList = oc.items?.map(i => `${i.title} (x${i.quantity}) - ${oc.currency || '$'}${i.price}`).join(', ') || '';
+      const eventLabel = state.eventType === 'order_fulfilled' ? 'Order Delivered' : 'New Order';
       orderSection = `
 CALL CONTEXT (EVENT-DRIVEN):
 This is an automated call triggered by: ${eventLabel}
 Order Number: ${oc.orderName || 'N/A'}
 Customer Name: ${oc.customerName || 'N/A'}
 Items: ${itemsList || 'N/A'}
-Total: ${oc.currency || '৳'}${oc.totalPrice || 'N/A'}
+Total: ${oc.currency || '$'}${oc.totalPrice || 'N/A'}
 ${oc.shippingAddress ? `Shipping Address: ${oc.shippingAddress}` : ''}
 ${state.eventType === 'order_placed' ? 'Your goal: Call the customer, confirm the order details, verify the delivery address, and answer any questions about the order.' : ''}
 ${state.eventType === 'order_fulfilled' ? 'Your goal: Inform the customer that their order has been shipped/delivered and ask if they have any questions.' : ''}
@@ -218,8 +218,8 @@ SPECIAL COMMANDS (append JSON at the END of your response when needed):
 - Tag order number: {"order_number": "#XXXX"}
 
 LANGUAGE:
-- You MUST respond ONLY in Bangla (Bengali) language. Every word of your response must be in Bangla.
-- Do NOT use English at all in your responses.
+- You MUST respond ONLY in English. Every word of your response must be in English.
+- Keep responses clear, concise, and professional.
 
 RULES:
 1. You can ONLY provide information — never modify store data.

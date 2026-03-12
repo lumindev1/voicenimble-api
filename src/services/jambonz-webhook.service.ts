@@ -71,17 +71,20 @@ export class JambonzWebhookService {
         $or: [{ phoneNumber: to }, { byonPhoneNumber: to }, { phoneNumber: from }, { byonPhoneNumber: from }],
         isActive: true,
       }).populate('shopId');
-      // Fallback: find any active agent (single-tenant / dev mode)
+      // Fallback: prefer inbound agent, then any active agent
       if (!agent) {
-        agent = await Agent.findOne({ isActive: true }).populate('shopId');
-        if (agent) logger.info(`Fallback: using active agent ${agent.agentName} (${agent._id})`);
+        agent = await Agent.findOne({ isActive: true, callType: 'inbound' }).populate('shopId');
+        if (!agent) {
+          agent = await Agent.findOne({ isActive: true }).populate('shopId');
+        }
+        if (agent) logger.info(`Fallback: using ${agent.callType} agent ${agent.agentName} (${agent._id})`);
       }
     }
 
     if (!agent) {
       logger.warn(`No active agent found for number: ${to}, agentId: ${agentId}`);
       return [
-        this.jambonz.buildSayVerb('দুঃখিত, এই সেবাটি বর্তমানে পাওয়া যাচ্ছে না। অনুগ্রহ করে পরে আবার কল করুন।', 'bn-IN-Wavenet-A', 'google'),
+        this.jambonz.buildSayVerb('Sorry, this service is currently unavailable. Please try again later.', 'en-US-Wavenet-C', 'google'),
         { verb: 'hangup' },
       ];
     }
@@ -91,7 +94,7 @@ export class JambonzWebhookService {
       : await Shop.findById(agent.shopId);
 
     if (!shop || !shop.isActive) {
-      return [this.jambonz.buildSayVerb('দুঃখিত, এই সেবাটি বর্তমানে পাওয়া যাচ্ছে না।', 'bn-IN-Wavenet-A', 'google'), { verb: 'hangup' }];
+      return [this.jambonz.buildSayVerb('Sorry, this service is currently unavailable.', 'en-US-Wavenet-C', 'google'), { verb: 'hangup' }];
     }
 
     // Check simultaneous call limit
@@ -101,7 +104,7 @@ export class JambonzWebhookService {
 
     if (activeCalls >= maxCalls) {
       return [
-        this.jambonz.buildSayVerb('আমাদের সকল এজেন্ট এখন ব্যস্ত আছেন। অনুগ্রহ করে কিছুক্ষণ পরে আবার চেষ্টা করুন।', 'bn-IN-Wavenet-A', 'google'),
+        this.jambonz.buildSayVerb('All our agents are currently busy. Please try again shortly.', 'en-US-Wavenet-C', 'google'),
         { verb: 'hangup' },
       ];
     }
@@ -185,7 +188,7 @@ export class JambonzWebhookService {
     }
 
     // Default: TTS greeting then gather
-    const recognizerLang = agent.primaryLanguage || 'bn-BD';
+    const recognizerLang = agent.primaryLanguage || 'en-US';
     jcml.push(
       this.jambonz.buildSayVerb(greeting, agent.voiceId, 'google', agent.voiceSpeed),
       this.jambonz.buildGatherVerb(gatherUrl, [], 8, recognizerLang),
@@ -203,10 +206,10 @@ export class JambonzWebhookService {
     if (!userInput.trim()) {
       const state = await this.aiService.getConversationState(call_sid);
       const agent = state ? await Agent.findById(state.agentId) : null;
-      const lang = agent?.primaryLanguage || 'bn-BD';
+      const lang = agent?.primaryLanguage || 'en-US';
       const gatherUrl = `${process.env.APP_URL}/jambonz/gather-result?callSid=${call_sid}`;
       return [
-        this.jambonz.buildSayVerb('আমি বুঝতে পারিনি, অনুগ্রহ করে আবার বলুন।', agent?.voiceId || 'bn-IN-Wavenet-A', 'google', agent?.voiceSpeed),
+        this.jambonz.buildSayVerb('I didn\'t catch that, could you please say that again?', agent?.voiceId || 'en-US-Wavenet-C', 'google', agent?.voiceSpeed),
         this.jambonz.buildGatherVerb(gatherUrl, [], 8, lang),
       ];
     }
@@ -214,7 +217,7 @@ export class JambonzWebhookService {
     const state = await this.aiService.getConversationState(call_sid);
     if (!state) {
       return [
-        this.jambonz.buildSayVerb('দুঃখিত, কিছু সমস্যা হয়েছে। অনুগ্রহ করে আবার কল করুন।', 'bn-IN-Wavenet-A', 'google'),
+        this.jambonz.buildSayVerb('Sorry, something went wrong. Please call again.', 'en-US-Wavenet-C', 'google'),
         { verb: 'hangup' },
       ];
     }
@@ -245,7 +248,7 @@ export class JambonzWebhookService {
       );
       return [
         this.jambonz.buildSayVerb(
-          `${aiResponse.text} আমি এখন আপনাকে আমাদের একজন দলের সদস্যের কাছে ট্রান্সফার করছি।`,
+          `${aiResponse.text} I'm now transferring you to one of our team members.`,
           agent.voiceId, 'google', agent.voiceSpeed,
         ),
         this.jambonz.buildTransferVerb(transferTo),
@@ -261,7 +264,7 @@ export class JambonzWebhookService {
     }
 
     // Continue conversation
-    const lang = agent?.primaryLanguage || 'bn-BD';
+    const lang = agent?.primaryLanguage || 'en-US';
     const gatherUrl = `${process.env.APP_URL}/jambonz/gather-result?callSid=${call_sid}`;
     return [
       this.jambonz.buildSayVerb(aiResponse.text, agent?.voiceId, 'google', agent?.voiceSpeed),

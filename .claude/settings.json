@@ -79,7 +79,11 @@
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f''''Username: {d.get\\(\"\"register_username\"\"\\)}\\\\nStatus: {json.dumps\\(d.get\\(\"\"register_status\"\"\\)\\)}''''\\)\")",
       "Bash(nc -z -w 5 178.128.94.119 5160)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\)[0]; print\\(''''Registration:'''', json.dumps\\(d[''''register_status''''], indent=2\\)\\)\")",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f''''Status: {d[\"\"call_status\"\"]}, SIP: {d[\"\"sip_status\"\"]} {d[\"\"sip_reason\"\"]}, Duration: {d.get\\(\"\"duration\"\",\"\"N/A\"\"\\)}''''\\)\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f''''Status: {d[\"\"call_status\"\"]}, SIP: {d[\"\"sip_status\"\"]} {d[\"\"sip_reason\"\"]}, Duration: {d.get\\(\"\"duration\"\",\"\"N/A\"\"\\)}''''\\)\")",
+      "Bash(npx --yes md-to-pdf --version)",
+      "Bash(npx --yes md-to-pdf QA-Testing-Guide.md)",
+      "Bash(open /Users/luminouslabs/Desktop/project/voice-nimble/QA-Testing-Guide.pdf)",
+      "Bash(npx md-to-pdf:*)"
     ],
     "additionalDirectories": [
       "/Users/luminouslabs/Desktop/project/voice-nimble/api/src",

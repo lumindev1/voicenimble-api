@@ -29,10 +29,12 @@ export class AgentController {
   // Create new agent
   async createAgent(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      const isConfigured = !!(req.body.agentName && req.body.greetingMessage);
       const agent = await Agent.create({
         ...req.body,
         shopId: req.shopId,
         shopDomain: req.shopDomain,
+        isConfigured,
       });
       res.status(201).json({ success: true, agent });
     } catch (error) {
@@ -43,6 +45,28 @@ export class AgentController {
   // Update agent
   async updateAgent(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      // If callType is being changed, check for conflict with active agents
+      if (req.body.callType) {
+        const currentAgent = await Agent.findOne({ _id: req.params.agentId, shopId: req.shopId });
+        if (!currentAgent) throw new AppError('Agent not found', 404);
+
+        if (req.body.callType !== currentAgent.callType) {
+          const existingActive = await Agent.findOne({
+            shopId: req.shopId,
+            callType: req.body.callType,
+            _id: { $ne: currentAgent._id },
+            isActive: true,
+          });
+
+          if (existingActive) {
+            throw new AppError(
+              `Cannot change to ${req.body.callType}. You already have an active ${req.body.callType} agent ("${existingActive.agentName}"). Deactivate it first.`,
+              400,
+            );
+          }
+        }
+      }
+
       const agent = await Agent.findOneAndUpdate(
         { _id: req.params.agentId, shopId: req.shopId },
         { ...req.body, shopDomain: req.shopDomain },
@@ -76,6 +100,21 @@ export class AgentController {
       const agent = await Agent.findOne({ _id: req.params.agentId, shopId: req.shopId });
       if (!agent) throw new AppError('Agent not found', 404);
       if (!agent.isConfigured) throw new AppError('Please fill in Agent Name and Greeting Message before activating', 400);
+
+      // Check if another agent with the same callType is already active
+      const existingActive = await Agent.findOne({
+        shopId: req.shopId,
+        callType: agent.callType,
+        _id: { $ne: agent._id },
+        isActive: true,
+      });
+
+      if (existingActive) {
+        throw new AppError(
+          `You already have an active ${agent.callType} agent ("${existingActive.agentName}"). Please deactivate it first before activating this one.`,
+          400,
+        );
+      }
 
       const existingAppSid = process.env.JAMBONZ_APPLICATION_SID || '7087fe50-8acb-4f3b-b820-97b573723aab';
       agent.jambonzApplicationId = existingAppSid;

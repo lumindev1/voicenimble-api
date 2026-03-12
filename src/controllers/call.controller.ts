@@ -68,8 +68,11 @@ export class CallController {
         return;
       }
 
-      // Find the active agent for this shop
-      const agent = await Agent.findOne({ shopId: req.shopId, isActive: true });
+      // Find the active outbound agent for this shop, fallback to any active agent
+      let agent = await Agent.findOne({ shopId: req.shopId, isActive: true, callType: 'outbound' });
+      if (!agent) {
+        agent = await Agent.findOne({ shopId: req.shopId, isActive: true });
+      }
       if (!agent) {
         res.status(400).json({ success: false, message: 'No active agent found. Please activate your agent first.' });
         return;
