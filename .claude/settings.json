@@ -83,7 +83,8 @@
       "Bash(npx --yes md-to-pdf --version)",
       "Bash(npx --yes md-to-pdf QA-Testing-Guide.md)",
       "Bash(open /Users/luminouslabs/Desktop/project/voice-nimble/QA-Testing-Guide.pdf)",
-      "Bash(npx md-to-pdf:*)"
+      "Bash(npx md-to-pdf:*)",
+      "Bash(pkill -f \"ts-node\\\\|nodemon\\\\|node.*index\")"
     ],
     "additionalDirectories": [
       "/Users/luminouslabs/Desktop/project/voice-nimble/api/src",

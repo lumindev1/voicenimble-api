@@ -12,7 +12,6 @@ export async function connectDatabase(): Promise<void> {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 45000,
-      directConnection: true,
     });
     logger.info('MongoDB connected successfully');
   } catch (error) {
