@@ -2,7 +2,7 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import Agent from '../models/agent.model';
 import { AppError } from '../middlewares/error.middleware';
-import { JambonzService } from '../services/jambonz.service';
+import { VoiceNimbleService } from '../services/voicenimble.service';
 
 export class AgentController {
   // List all agents for this shop
@@ -116,8 +116,8 @@ export class AgentController {
         );
       }
 
-      const existingAppSid = process.env.JAMBONZ_APPLICATION_SID || '7087fe50-8acb-4f3b-b820-97b573723aab';
-      agent.jambonzApplicationId = existingAppSid;
+      const existingAppSid = process.env.VOICENIMBLE_APPLICATION_SID || '7087fe50-8acb-4f3b-b820-97b573723aab';
+      agent.voiceNimbleApplicationId = existingAppSid;
       agent.isActive = true;
       await agent.save();
 
@@ -144,16 +144,28 @@ export class AgentController {
   async getAvailableVoices(_req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const voices = [
-        { id: 'en-US-Standard-F', name: 'Standard F', language: 'en-US', gender: 'female' },
-        { id: 'en-US-Standard-B', name: 'Standard B', language: 'en-US', gender: 'male' },
-        { id: 'en-US-Standard-C', name: 'Standard C', language: 'en-US', gender: 'female' },
-        { id: 'en-US-Standard-D', name: 'Standard D', language: 'en-US', gender: 'male' },
-        { id: 'en-US-Neural2-F', name: 'Neural2 F', language: 'en-US', gender: 'female' },
-        { id: 'en-US-Neural2-D', name: 'Neural2 D', language: 'en-US', gender: 'male' },
-        { id: 'en-US-Wavenet-F', name: 'WaveNet F', language: 'en-US', gender: 'female' },
-        { id: 'en-US-Wavenet-D', name: 'WaveNet D', language: 'en-US', gender: 'male' },
-        { id: 'en-GB-Standard-A', name: 'GB Standard A', language: 'en-GB', gender: 'female' },
-        { id: 'en-GB-Standard-B', name: 'GB Standard B', language: 'en-GB', gender: 'male' },
+        // Google TTS voices
+        { id: 'en-US-Standard-F', name: 'Standard F', language: 'en-US', gender: 'female', vendor: 'google' },
+        { id: 'en-US-Standard-B', name: 'Standard B', language: 'en-US', gender: 'male', vendor: 'google' },
+        { id: 'en-US-Standard-C', name: 'Standard C', language: 'en-US', gender: 'female', vendor: 'google' },
+        { id: 'en-US-Standard-D', name: 'Standard D', language: 'en-US', gender: 'male', vendor: 'google' },
+        { id: 'en-US-Neural2-F', name: 'Neural2 F', language: 'en-US', gender: 'female', vendor: 'google' },
+        { id: 'en-US-Neural2-D', name: 'Neural2 D', language: 'en-US', gender: 'male', vendor: 'google' },
+        { id: 'en-US-Wavenet-F', name: 'WaveNet F', language: 'en-US', gender: 'female', vendor: 'google' },
+        { id: 'en-US-Wavenet-D', name: 'WaveNet D', language: 'en-US', gender: 'male', vendor: 'google' },
+        { id: 'en-GB-Standard-A', name: 'GB Standard A', language: 'en-GB', gender: 'female', vendor: 'google' },
+        { id: 'en-GB-Standard-B', name: 'GB Standard B', language: 'en-GB', gender: 'male', vendor: 'google' },
+        // ElevenLabs TTS voices
+        { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', language: 'en-US', gender: 'female', vendor: 'elevenlabs' },
+        { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', language: 'en-US', gender: 'male', vendor: 'elevenlabs' },
+        { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', language: 'en-US', gender: 'female', vendor: 'elevenlabs' },
+        { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', language: 'en-US', gender: 'female', vendor: 'elevenlabs' },
+        { id: 'bIHbv24MWmeRgasZH58o', name: 'Will', language: 'en-US', gender: 'male', vendor: 'elevenlabs' },
+        { id: 'cjVigY5qzO86Huf0OWal', name: 'Eric', language: 'en-US', gender: 'male', vendor: 'elevenlabs' },
+        { id: 'iP95p4xoKVk53GoZ742B', name: 'Chris', language: 'en-US', gender: 'male', vendor: 'elevenlabs' },
+        { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', language: 'en-US', gender: 'male', vendor: 'elevenlabs' },
+        { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', language: 'en-US', gender: 'female', vendor: 'elevenlabs' },
+        { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', language: 'en-GB', gender: 'male', vendor: 'elevenlabs' },
       ];
       res.json({ success: true, voices });
     } catch (error) {
@@ -163,8 +175,8 @@ export class AgentController {
 
   async getAvailablePhoneNumbers(_req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const jambonz = new JambonzService();
-      const numbers = await jambonz.getAvailablePhoneNumbers('US');
+      const voiceNimble = new VoiceNimbleService();
+      const numbers = await voiceNimble.getAvailablePhoneNumbers('US');
       res.json({ success: true, phoneNumbers: numbers });
     } catch (error) {
       next(error);
@@ -177,8 +189,8 @@ export class AgentController {
       const agent = await Agent.findOne({ _id: req.params.agentId, shopId: req.shopId });
       if (!agent) throw new AppError('Agent not found', 404);
 
-      const jambonz = new JambonzService();
-      const sid = await jambonz.provisionPhoneNumber(phoneNumber, agent.jambonzApplicationId);
+      const voiceNimble = new VoiceNimbleService();
+      const sid = await voiceNimble.provisionPhoneNumber(phoneNumber, agent.voiceNimbleApplicationId);
 
       agent.phoneNumber = phoneNumber;
       agent.phoneNumberSid = sid;

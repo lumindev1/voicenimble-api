@@ -98,9 +98,9 @@ async function processBroadcastJob(job: Job): Promise<void> {
   // Load contacts
   const contacts = await Contact.find({ _id: { $in: broadcast.contactIds } });
 
-  const baseUrl = process.env.JAMBONZ_BASE_URL!;
-  const apiKey = process.env.JAMBONZ_API_KEY!;
-  const accountSid = process.env.JAMBONZ_ACCOUNT_SID!;
+  const baseUrl = process.env.VOICENIMBLE_BASE_URL!;
+  const apiKey = process.env.VOICENIMBLE_API_KEY!;
+  const accountSid = process.env.VOICENIMBLE_ACCOUNT_SID!;
   const appUrl = process.env.APP_URL!;
 
   // Look up merchant's SIP trunk
@@ -123,16 +123,16 @@ async function processBroadcastJob(job: Job): Promise<void> {
       };
 
       const callPayload: Record<string, unknown> = {
-        application_sid: process.env.JAMBONZ_APPLICATION_SID,
+        application_sid: process.env.VOICENIMBLE_APPLICATION_SID,
         from,
         to: { type: 'phone', number: contact.phone },
         tag,
-        call_hook: { url: `${appUrl}/jambonz/call-event`, method: 'POST' },
-        call_status_hook: { url: `${appUrl}/jambonz/call-status`, method: 'POST' },
+        call_hook: { url: `${appUrl}/voicenimble/call-event`, method: 'POST' },
+        call_status_hook: { url: `${appUrl}/voicenimble/call-status`, method: 'POST' },
       };
 
-      if (sipTrunk?.jambonzCarrierSid) {
-        callPayload.sip_trunk = sipTrunk.jambonzCarrierSid;
+      if (sipTrunk?.voiceNimbleCarrierSid) {
+        callPayload.sip_trunk = sipTrunk.voiceNimbleCarrierSid;
       }
 
       await axios.post(
@@ -194,9 +194,9 @@ async function processEventDrivenJob(job: Job): Promise<void> {
 
   const template = await CallTemplate.findById(templateId);
 
-  const baseUrl = process.env.JAMBONZ_BASE_URL!;
-  const apiKey = process.env.JAMBONZ_API_KEY!;
-  const accountSid = process.env.JAMBONZ_ACCOUNT_SID!;
+  const baseUrl = process.env.VOICENIMBLE_BASE_URL!;
+  const apiKey = process.env.VOICENIMBLE_API_KEY!;
+  const accountSid = process.env.VOICENIMBLE_ACCOUNT_SID!;
   const appUrl = process.env.APP_URL!;
 
   // Look up merchant's SIP trunk
@@ -216,16 +216,16 @@ async function processEventDrivenJob(job: Job): Promise<void> {
 
   try {
     const callPayload: Record<string, unknown> = {
-      application_sid: process.env.JAMBONZ_APPLICATION_SID,
+      application_sid: process.env.VOICENIMBLE_APPLICATION_SID,
       from,
       to: { type: 'phone', number: customerPhone },
       tag,
-      call_hook: { url: `${appUrl}/jambonz/call-event`, method: 'POST' },
-      call_status_hook: { url: `${appUrl}/jambonz/call-status`, method: 'POST' },
+      call_hook: { url: `${appUrl}/voicenimble/call-event`, method: 'POST' },
+      call_status_hook: { url: `${appUrl}/voicenimble/call-status`, method: 'POST' },
     };
 
-    if (sipTrunk?.jambonzCarrierSid) {
-      callPayload.sip_trunk = sipTrunk.jambonzCarrierSid;
+    if (sipTrunk?.voiceNimbleCarrierSid) {
+      callPayload.sip_trunk = sipTrunk.voiceNimbleCarrierSid;
     }
 
     await axios.post(

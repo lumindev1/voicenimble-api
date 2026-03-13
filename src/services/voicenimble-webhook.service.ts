@@ -5,11 +5,11 @@ import CallTemplate from '../models/call-template.model';
 import CallTranscript from '../models/call-transcript.model';
 import Subscription from '../models/subscription.model';
 import { AIConversationService } from './ai-conversation.service';
-import { JambonzService } from './jambonz.service';
+import { VoiceNimbleService } from './voicenimble.service';
 import { analyticsQueue, emailQueue } from '../jobs/queues';
 import logger from '../utils/logger';
 
-interface JambonzCallPayload {
+interface VoiceNimbleCallPayload {
   call_sid: string;
   call_status?: string;
   to: string;
@@ -24,18 +24,18 @@ interface JambonzCallPayload {
   shopDomain?: string;
   templateId?: string;
   callType?: string; // 'test' | 'broadcast' | 'event'
-  // Jambonz renames the "tag" field to "customerData" in webhook payloads
+  // The "tag" field is renamed to "customerData" in webhook payloads
   customerData?: Record<string, string>;
   tag?: string | Record<string, string>;
 }
 
-export class JambonzWebhookService {
+export class VoiceNimbleWebhookService {
   private readonly aiService = new AIConversationService();
-  private readonly jambonz = new JambonzService();
+  private readonly voiceNimble = new VoiceNimbleService();
 
-  async handleIncomingCall(payload: JambonzCallPayload): Promise<unknown[]> {
+  async handleIncomingCall(payload: VoiceNimbleCallPayload): Promise<unknown[]> {
     logger.info(`Raw call payload: ${JSON.stringify(payload)}`);
-    // Jambonz sends the "tag" field as "customerData" in webhook payloads
+    // The "tag" field is sent as "customerData" in webhook payloads
     let tagData: Record<string, string> = {};
     if (payload.customerData) {
       tagData = payload.customerData;
@@ -84,7 +84,7 @@ export class JambonzWebhookService {
     if (!agent) {
       logger.warn(`No active agent found for number: ${to}, agentId: ${agentId}`);
       return [
-        this.jambonz.buildSayVerb('Sorry, this service is currently unavailable. Please try again later.', 'en-US-Wavenet-C', 'google'),
+        this.voiceNimble.buildSayVerb('Sorry, this service is currently unavailable. Please try again later.', 'en-US-Wavenet-C', 'google'),
         { verb: 'hangup' },
       ];
     }
@@ -94,7 +94,7 @@ export class JambonzWebhookService {
       : await Shop.findById(agent.shopId);
 
     if (!shop || !shop.isActive) {
-      return [this.jambonz.buildSayVerb('Sorry, this service is currently unavailable.', 'en-US-Wavenet-C', 'google'), { verb: 'hangup' }];
+      return [this.voiceNimble.buildSayVerb('Sorry, this service is currently unavailable.', 'en-US-Wavenet-C', 'google'), { verb: 'hangup' }];
     }
 
     // Check simultaneous call limit
@@ -104,7 +104,7 @@ export class JambonzWebhookService {
 
     if (activeCalls >= maxCalls) {
       return [
-        this.jambonz.buildSayVerb('All our agents are currently busy. Please try again shortly.', 'en-US-Wavenet-C', 'google'),
+        this.voiceNimble.buildSayVerb('All our agents are currently busy. Please try again shortly.', 'en-US-Wavenet-C', 'google'),
         { verb: 'hangup' },
       ];
     }
@@ -166,12 +166,12 @@ export class JambonzWebhookService {
     );
 
     // Build JCML response
-    const gatherUrl = `${process.env.APP_URL}/jambonz/gather-result?callSid=${call_sid}`;
+    const gatherUrl = `${process.env.APP_URL}/voicenimble/gather-result?callSid=${call_sid}`;
     const jcml: unknown[] = [];
 
     // Recording if subscription supports it
     if (subscription?.hasCallRecording) {
-      jcml.push(this.jambonz.buildRecordVerb(`${process.env.APP_URL}/jambonz/recording-status?callSid=${call_sid}`));
+      jcml.push(this.voiceNimble.buildRecordVerb(`${process.env.APP_URL}/voicenimble/recording-status?callSid=${call_sid}`));
     }
 
     // Handle static template with audio URL
@@ -181,7 +181,7 @@ export class JambonzWebhookService {
         // Play pre-recorded audio then gather
         jcml.push(
           { verb: 'play', url: template.audioUrl },
-          this.jambonz.buildGatherVerb(gatherUrl, [], 8),
+          this.voiceNimble.buildGatherVerb(gatherUrl, [], 8),
         );
         return jcml;
       }
@@ -189,15 +189,17 @@ export class JambonzWebhookService {
 
     // Default: TTS greeting then gather
     const recognizerLang = agent.primaryLanguage || 'en-US';
+    const sayVerb = this.voiceNimble.buildSayVerb(greeting, agent.voiceId, agent.ttsVendor || 'google', agent.voiceSpeed);
+    logger.info(`JCML say verb: ${JSON.stringify(sayVerb)}`);
     jcml.push(
-      this.jambonz.buildSayVerb(greeting, agent.voiceId, 'google', agent.voiceSpeed),
-      this.jambonz.buildGatherVerb(gatherUrl, [], 8, recognizerLang),
+      sayVerb,
+      this.voiceNimble.buildGatherVerb(gatherUrl, [], 8, recognizerLang, agent.sttVendor || 'google'),
     );
 
     return jcml;
   }
 
-  async handleUserSpeech(payload: JambonzCallPayload): Promise<unknown[]> {
+  async handleUserSpeech(payload: VoiceNimbleCallPayload): Promise<unknown[]> {
     const { call_sid, speech } = payload;
 
     const userInput = speech?.alternatives?.[0]?.transcript || '';
@@ -207,17 +209,17 @@ export class JambonzWebhookService {
       const state = await this.aiService.getConversationState(call_sid);
       const agent = state ? await Agent.findById(state.agentId) : null;
       const lang = agent?.primaryLanguage || 'en-US';
-      const gatherUrl = `${process.env.APP_URL}/jambonz/gather-result?callSid=${call_sid}`;
+      const gatherUrl = `${process.env.APP_URL}/voicenimble/gather-result?callSid=${call_sid}`;
       return [
-        this.jambonz.buildSayVerb('I didn\'t catch that, could you please say that again?', agent?.voiceId || 'en-US-Wavenet-C', 'google', agent?.voiceSpeed),
-        this.jambonz.buildGatherVerb(gatherUrl, [], 8, lang),
+        this.voiceNimble.buildSayVerb('I didn\'t catch that, could you please say that again?', agent?.voiceId || 'en-US-Wavenet-C', agent?.ttsVendor || 'google', agent?.voiceSpeed),
+        this.voiceNimble.buildGatherVerb(gatherUrl, [], 8, lang, agent?.sttVendor || 'google'),
       ];
     }
 
     const state = await this.aiService.getConversationState(call_sid);
     if (!state) {
       return [
-        this.jambonz.buildSayVerb('Sorry, something went wrong. Please call again.', 'en-US-Wavenet-C', 'google'),
+        this.voiceNimble.buildSayVerb('Sorry, something went wrong. Please call again.', 'en-US-Wavenet-C', 'google'),
         { verb: 'hangup' },
       ];
     }
@@ -247,32 +249,32 @@ export class JambonzWebhookService {
         { wasTransferred: true, transferredTo: transferTo, transferredAt: new Date() },
       );
       return [
-        this.jambonz.buildSayVerb(
+        this.voiceNimble.buildSayVerb(
           `${aiResponse.text} I'm now transferring you to one of our team members.`,
-          agent.voiceId, 'google', agent.voiceSpeed,
+          agent.voiceId, agent.ttsVendor || 'google', agent.voiceSpeed,
         ),
-        this.jambonz.buildTransferVerb(transferTo),
+        this.voiceNimble.buildTransferVerb(transferTo),
       ];
     }
 
     // End call
     if (aiResponse.shouldEndCall) {
       return [
-        this.jambonz.buildSayVerb(aiResponse.text, agent?.voiceId, 'google', agent?.voiceSpeed),
+        this.voiceNimble.buildSayVerb(aiResponse.text, agent?.voiceId, agent?.ttsVendor || 'google', agent?.voiceSpeed),
         { verb: 'hangup' },
       ];
     }
 
     // Continue conversation
     const lang = agent?.primaryLanguage || 'en-US';
-    const gatherUrl = `${process.env.APP_URL}/jambonz/gather-result?callSid=${call_sid}`;
+    const gatherUrl = `${process.env.APP_URL}/voicenimble/gather-result?callSid=${call_sid}`;
     return [
-      this.jambonz.buildSayVerb(aiResponse.text, agent?.voiceId, 'google', agent?.voiceSpeed),
-      this.jambonz.buildGatherVerb(gatherUrl, [], 10, lang),
+      this.voiceNimble.buildSayVerb(aiResponse.text, agent?.voiceId, agent?.ttsVendor || 'google', agent?.voiceSpeed),
+      this.voiceNimble.buildGatherVerb(gatherUrl, [], 10, lang, agent?.sttVendor || 'google'),
     ];
   }
 
-  async handleCallStatus(payload: JambonzCallPayload): Promise<void> {
+  async handleCallStatus(payload: VoiceNimbleCallPayload): Promise<void> {
     const { call_sid, call_status, duration, to, from } = payload;
     logger.info(`Call status update [${call_sid}]: ${call_status}, duration: ${duration}s, from: ${from}, to: ${to}`);
 
@@ -352,17 +354,17 @@ export class JambonzWebhookService {
     );
   }
 
-  async buildTransferResponse(payload: JambonzCallPayload): Promise<unknown[]> {
+  async buildTransferResponse(payload: VoiceNimbleCallPayload): Promise<unknown[]> {
     const { call_sid } = payload;
     const state = await this.aiService.getConversationState(call_sid);
     const agent = state ? await Agent.findById(state.agentId) : null;
 
     if (agent?.humanHandoffNumber) {
-      return [this.jambonz.buildTransferVerb(agent.humanHandoffNumber)];
+      return [this.voiceNimble.buildTransferVerb(agent.humanHandoffNumber)];
     }
 
     return [
-      this.jambonz.buildSayVerb('Transfer unavailable. Thank you for calling. Goodbye.'),
+      this.voiceNimble.buildSayVerb('Transfer unavailable. Thank you for calling. Goodbye.'),
       { verb: 'hangup' },
     ];
   }

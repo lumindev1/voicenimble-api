@@ -1,11 +1,11 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import SipTrunk from '../models/sip-trunk.model';
-import { JambonzService } from '../services/jambonz.service';
+import { VoiceNimbleService } from '../services/voicenimble.service';
 import { AppError } from '../middlewares/error.middleware';
 import logger from '../utils/logger';
 
-const jambonz = new JambonzService();
+const voiceNimble = new VoiceNimbleService();
 
 export class SipTrunkController {
   async getAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -35,25 +35,25 @@ export class SipTrunkController {
         throw new AppError('Name, SIP host, and caller ID number are required', 400);
       }
 
-      // Create carrier in Jambonz
+      // Create carrier in VoiceNimble
       const carrierName = `VN-${req.shopDomain}-${name}`.replace(/[^a-zA-Z0-9-_]/g, '-');
-      let jambonzCarrierSid: string | undefined;
-      let jambonzGatewaySid: string | undefined;
+      let voiceNimbleCarrierSid: string | undefined;
+      let voiceNimbleGatewaySid: string | undefined;
 
       try {
-        jambonzCarrierSid = await jambonz.createCarrier(carrierName, description);
-        jambonzGatewaySid = await jambonz.createSipGateway(
-          jambonzCarrierSid,
+        voiceNimbleCarrierSid = await voiceNimble.createCarrier(carrierName, description);
+        voiceNimbleGatewaySid = await voiceNimble.createSipGateway(
+          voiceNimbleCarrierSid,
           sipHost,
           sipPort || 5060,
           sipProtocol || 'udp',
         );
-        logger.info(`Created Jambonz carrier ${jambonzCarrierSid} + gateway ${jambonzGatewaySid} for ${req.shopDomain}`);
+        logger.info(`Created VoiceNimble carrier ${voiceNimbleCarrierSid} + gateway ${voiceNimbleGatewaySid} for ${req.shopDomain}`);
       } catch (err) {
-        logger.error('Failed to create Jambonz carrier/gateway:', err);
+        logger.error('Failed to create VoiceNimble carrier/gateway:', err);
         // Clean up if partial creation
-        if (jambonzCarrierSid) {
-          try { await jambonz.deleteCarrier(jambonzCarrierSid); } catch { /* ignore */ }
+        if (voiceNimbleCarrierSid) {
+          try { await voiceNimble.deleteCarrier(voiceNimbleCarrierSid); } catch { /* ignore */ }
         }
         throw new AppError('Failed to register SIP trunk with phone system', 500);
       }
@@ -74,8 +74,8 @@ export class SipTrunkController {
         sipRealm,
         callerIdNumber,
         callerIdName,
-        jambonzCarrierSid,
-        jambonzGatewaySid,
+        voiceNimbleCarrierSid,
+        voiceNimbleGatewaySid,
         isDefault: existingCount === 0,
       });
 
@@ -92,17 +92,17 @@ export class SipTrunkController {
 
       const { name, description, sipHost, sipPort, sipProtocol, callerIdNumber, callerIdName } = req.body;
 
-      // Update Jambonz gateway if SIP host changed
-      if (trunk.jambonzGatewaySid && (sipHost || sipPort || sipProtocol)) {
+      // Update VoiceNimble gateway if SIP host changed
+      if (trunk.voiceNimbleGatewaySid && (sipHost || sipPort || sipProtocol)) {
         try {
-          await jambonz.updateSipGateway(
-            trunk.jambonzGatewaySid,
+          await voiceNimble.updateSipGateway(
+            trunk.voiceNimbleGatewaySid,
             sipHost || trunk.sipHost,
             sipPort || trunk.sipPort,
             sipProtocol || trunk.sipProtocol,
           );
         } catch (err) {
-          logger.error('Failed to update Jambonz gateway:', err);
+          logger.error('Failed to update VoiceNimble gateway:', err);
           throw new AppError('Failed to update SIP trunk with phone system', 500);
         }
       }
@@ -132,12 +132,12 @@ export class SipTrunkController {
       const trunk = await SipTrunk.findOne({ _id: req.params.trunkId, shopId: req.shopId });
       if (!trunk) throw new AppError('SIP trunk not found', 404);
 
-      // Delete from Jambonz
-      if (trunk.jambonzGatewaySid) {
-        try { await jambonz.deleteSipGateway(trunk.jambonzGatewaySid); } catch { /* ignore */ }
+      // Delete from VoiceNimble
+      if (trunk.voiceNimbleGatewaySid) {
+        try { await voiceNimble.deleteSipGateway(trunk.voiceNimbleGatewaySid); } catch { /* ignore */ }
       }
-      if (trunk.jambonzCarrierSid) {
-        try { await jambonz.deleteCarrier(trunk.jambonzCarrierSid); } catch { /* ignore */ }
+      if (trunk.voiceNimbleCarrierSid) {
+        try { await voiceNimble.deleteCarrier(trunk.voiceNimbleCarrierSid); } catch { /* ignore */ }
       }
 
       await SipTrunk.findByIdAndDelete(trunk._id);

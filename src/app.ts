@@ -16,7 +16,7 @@ import billingRoutes from './routes/billing.routes';
 import skillsRoutes from './routes/skills.routes';
 import notificationRoutes from './routes/notification.routes';
 import webhookRoutes from './routes/webhook.routes';
-import jambonzRoutes from './routes/jambonz.routes';
+import voiceNimbleRoutes from './routes/voicenimble.routes';
 import contactRoutes from './routes/contact.routes';
 import templateRoutes from './routes/template.routes';
 import knowledgeBaseRoutes from './routes/knowledge-base.routes';
@@ -67,8 +67,8 @@ app.use('/api/', limiter);
 
 // Body parsing - raw for webhooks BEFORE json parser
 app.use('/webhooks', express.raw({ type: 'application/json' }));
-app.use('/jambonz', express.urlencoded({ extended: true }));
-app.use('/jambonz', express.json());
+app.use('/voicenimble', express.urlencoded({ extended: true }));
+app.use('/voicenimble', express.json());
 
 // Standard body parsing
 app.use(express.json({ limit: '10mb' }));
@@ -104,7 +104,7 @@ app.use('/api/event-driven', eventDrivenRoutes);
 app.use('/api/test-call', testCallRoutes);
 app.use('/api/sip-trunks', sipTrunkRoutes);
 app.use('/webhooks', webhookRoutes);
-app.use('/jambonz', jambonzRoutes);
+app.use('/voicenimble', voiceNimbleRoutes);
 
 // Proxy everything else to Vite frontend in development
 if (process.env.NODE_ENV !== 'production') {

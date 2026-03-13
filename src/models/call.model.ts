@@ -21,7 +21,7 @@ export interface ICall extends Document {
   agentId: mongoose.Types.ObjectId;
 
   // Call details
-  callSid: string; // Jambonz call SID
+  callSid: string; // VoiceNimble call SID
   direction: CallDirection;
   status: CallStatus;
   callerNumber: string;
@@ -54,8 +54,8 @@ export interface ICall extends Document {
   // Cost
   minutesBilled: number;
 
-  // Raw Jambonz data
-  jambonzData?: Record<string, unknown>;
+  // Raw VoiceNimble data
+  voiceNimbleData?: Record<string, unknown>;
 
   createdAt: Date;
   updatedAt: Date;
@@ -102,7 +102,7 @@ const callSchema = new Schema<ICall>(
     },
 
     minutesBilled: { type: Number, default: 0 },
-    jambonzData: { type: Schema.Types.Mixed },
+    voiceNimbleData: { type: Schema.Types.Mixed },
   },
   { timestamps: true },
 );

@@ -1,29 +1,29 @@
 import axios, { AxiosInstance } from 'axios';
 import logger from '../utils/logger';
 
-interface JambonzApplication {
+interface VoiceNimbleApplication {
   name: string;
   call_webhook: { url: string; method: string };
   call_status_webhook: { url: string; method: string };
 }
 
-interface JambonzPhoneNumber {
+interface VoiceNimblePhoneNumber {
   number: string;
   number_type: string;
   country_code: string;
   sip_realm?: string;
 }
 
-export class JambonzService {
+export class VoiceNimbleService {
   private readonly client: AxiosInstance;
   private readonly accountSid: string;
 
   constructor() {
-    this.accountSid = process.env.JAMBONZ_ACCOUNT_SID!;
+    this.accountSid = process.env.VOICENIMBLE_ACCOUNT_SID!;
     this.client = axios.create({
-      baseURL: process.env.JAMBONZ_BASE_URL,
+      baseURL: process.env.VOICENIMBLE_BASE_URL,
       headers: {
-        Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+        Authorization: `Bearer ${process.env.VOICENIMBLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       timeout: 10000,
@@ -36,7 +36,7 @@ export class JambonzService {
     callEventWebhookUrl: string,
     shopDomain: string,
   ): Promise<string> {
-    const payload: JambonzApplication = {
+    const payload: VoiceNimbleApplication = {
       name: `VoiceNimble-${shopDomain}-${name}`,
       call_webhook: {
         url: callEventWebhookUrl,
@@ -55,16 +55,16 @@ export class JambonzService {
     return res.data.sid;
   }
 
-  async getApplication(appSid: string): Promise<JambonzApplication & { sid: string }> {
+  async getApplication(appSid: string): Promise<VoiceNimbleApplication & { sid: string }> {
     const res = await this.client.get(
       `/v1/Accounts/${this.accountSid}/Applications/${appSid}`,
     );
     return res.data;
   }
 
-  async updateApplication(appSid: string, data: Partial<JambonzApplication>): Promise<void> {
+  async updateApplication(appSid: string, data: Partial<VoiceNimbleApplication>): Promise<void> {
     await this.client.put(
-      `/v1/Accounts/${this.accountSid}/Applications/${appSid}`,
+      `/v1/Applications/${appSid}`,
       data,
     );
   }
@@ -75,14 +75,14 @@ export class JambonzService {
     );
   }
 
-  async getAvailablePhoneNumbers(countryCode = 'US'): Promise<JambonzPhoneNumber[]> {
+  async getAvailablePhoneNumbers(countryCode = 'US'): Promise<VoiceNimblePhoneNumber[]> {
     try {
       const res = await this.client.get(
         `/v1/Accounts/${this.accountSid}/PhoneNumbers?in_use=false&country=${countryCode}`,
       );
       return res.data?.phone_numbers || [];
     } catch (err) {
-      logger.error('Failed to get Jambonz phone numbers:', err);
+      logger.error('Failed to get VoiceNimble phone numbers:', err);
       return [];
     }
   }
@@ -109,11 +109,11 @@ export class JambonzService {
   }
 
   async transferCall(callSid: string, transferTo: string): Promise<void> {
-    // Jambonz call transfer - redirect the call to a new target
+    // VoiceNimble call transfer - redirect the call to a new target
     await this.client.put(
       `/v1/Accounts/${this.accountSid}/Calls/${callSid}`,
       {
-        redirect_url: `${process.env.APP_URL}/jambonz/transfer-webhook`,
+        redirect_url: `${process.env.APP_URL}/voicenimble/transfer-webhook`,
         transfer_to: transferTo,
       },
     );
@@ -126,15 +126,86 @@ export class JambonzService {
     );
   }
 
+  // ---- Speech Credentials Management ----
+
+  async addElevenLabsSpeechCredential(): Promise<string> {
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    if (!apiKey) throw new Error('ELEVENLABS_API_KEY not set');
+
+    // Check if credential already exists
+    const existing = await this.listSpeechCredentials();
+    const elevenLabsCred = existing.find(
+      (c: Record<string, unknown>) => c.vendor === 'elevenlabs',
+    );
+    if (elevenLabsCred) {
+      return elevenLabsCred.speech_credential_sid as string;
+    }
+
+    const res = await this.client.post(
+      `/v1/Accounts/${this.accountSid}/SpeechCredentials`,
+      {
+        vendor: 'elevenlabs',
+        api_key: apiKey,
+        use_for_tts: true,
+        use_for_stt: false,
+      },
+    );
+    return res.data.sid;
+  }
+
+  async listSpeechCredentials(): Promise<Record<string, unknown>[]> {
+    try {
+      const res = await this.client.get(
+        `/v1/Accounts/${this.accountSid}/SpeechCredentials`,
+      );
+      return res.data || [];
+    } catch {
+      return [];
+    }
+  }
+
   // ---- SIP Trunk / Carrier Management ----
 
-  async createCarrier(name: string, description?: string): Promise<string> {
-    const res = await this.client.post('/v1/VoipCarriers', {
+  async createCarrier(
+    name: string,
+    description?: string,
+    credentials?: {
+      username?: string;
+      password?: string;
+      realm?: string;
+    },
+  ): Promise<string> {
+    const payload: Record<string, unknown> = {
       name,
       description: description || '',
       account_sid: this.accountSid,
-    });
+    };
+
+    // SIP trunk registration credentials (needed for carriers that require auth)
+    if (credentials?.username && credentials?.password) {
+      payload.register_username = credentials.username;
+      payload.register_password = credentials.password;
+      payload.register_sip_realm = credentials.realm || '';
+    }
+
+    const res = await this.client.post('/v1/VoipCarriers', payload);
     return res.data.sid;
+  }
+
+  async updateCarrier(
+    carrierSid: string,
+    credentials: {
+      username?: string;
+      password?: string;
+      realm?: string;
+    },
+  ): Promise<void> {
+    const payload: Record<string, unknown> = {};
+    if (credentials.username) payload.register_username = credentials.username;
+    if (credentials.password) payload.register_password = credentials.password;
+    if (credentials.realm) payload.register_sip_realm = credentials.realm;
+
+    await this.client.put(`/v1/VoipCarriers/${carrierSid}`, payload);
   }
 
   async deleteCarrier(carrierSid: string): Promise<void> {
@@ -176,13 +247,22 @@ export class JambonzService {
     });
   }
 
-  // Build Jambonz JCML (call control JSON) for saying something via TTS
+  // Build JCML (call control JSON) for saying something via TTS
   buildSayVerb(
     text: string,
     voiceId = 'en-US-Standard-F',
     synthesizer = 'google',
     speed = 1.0,
   ): Record<string, unknown> {
+    if (synthesizer === 'elevenlabs') {
+      const appUrl = process.env.APP_URL || 'https://caren-auld-johnsie.ngrok-free.dev';
+      const ttsUrl = `${appUrl}/voicenimble/tts/elevenlabs?voice=${encodeURIComponent(voiceId)}&text=${encodeURIComponent(text)}`;
+      return {
+        verb: 'play',
+        url: ttsUrl,
+      };
+    }
+
     return {
       verb: 'say',
       text,
@@ -195,12 +275,13 @@ export class JambonzService {
     };
   }
 
-  // Build Jambonz JCML for gathering speech input
+  // Build JCML for gathering speech input
   buildGatherVerb(
     actionUrl: string,
     hints: string[] = [],
     timeout = 10,
     language = 'en-US',
+    sttVendor = 'google',
   ): Record<string, unknown> {
     return {
       verb: 'gather',
@@ -208,7 +289,7 @@ export class JambonzService {
       input: ['speech'],
       timeout,
       recognizer: {
-        vendor: 'google',
+        vendor: sttVendor,
         language,
         hints,
         hintsBoost: 10,
@@ -220,7 +301,7 @@ export class JambonzService {
   buildTransferVerb(phoneNumber: string): Record<string, unknown> {
     return {
       verb: 'dial',
-      callerId: process.env.JAMBONZ_CALLER_ID || '+10000000000',
+      callerId: process.env.VOICENIMBLE_CALLER_ID || '+10000000000',
       target: [
         {
           type: 'phone',
@@ -235,7 +316,7 @@ export class JambonzService {
     return {
       verb: 'record',
       action: actionUrl,
-      recordingStatusCallback: `${process.env.APP_URL}/jambonz/recording-status`,
+      recordingStatusCallback: `${process.env.APP_URL}/voicenimble/recording-status`,
       recordingStatusCallbackMethod: 'POST',
       trim: 'trim-silence',
       playBeep: false,

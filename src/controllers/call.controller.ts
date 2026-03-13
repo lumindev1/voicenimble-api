@@ -22,7 +22,7 @@ export class CallController {
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit)
-          .select('-jambonzData'),
+          .select('-voiceNimbleData'),
         Call.countDocuments(filter),
       ]);
 
@@ -78,9 +78,9 @@ export class CallController {
         return;
       }
 
-      const baseUrl = process.env.JAMBONZ_BASE_URL!;
-      const apiKey = process.env.JAMBONZ_API_KEY!;
-      const accountSid = process.env.JAMBONZ_ACCOUNT_SID!;
+      const baseUrl = process.env.VOICENIMBLE_BASE_URL!;
+      const apiKey = process.env.VOICENIMBLE_API_KEY!;
+      const accountSid = process.env.VOICENIMBLE_ACCOUNT_SID!;
       const appUrl = process.env.APP_URL!;
       const fromNumber = from || agent.byonPhoneNumber || agent.phoneNumber || process.env.DEFAULT_FROM_NUMBER || '01521206630';
 
@@ -94,16 +94,16 @@ export class CallController {
       const response = await axios.post(
         `${baseUrl}/v1/Accounts/${accountSid}/Calls`,
         {
-          application_sid: process.env.JAMBONZ_APPLICATION_SID || '7087fe50-8acb-4f3b-b820-97b573723aab',
+          application_sid: process.env.VOICENIMBLE_APPLICATION_SID || '7087fe50-8acb-4f3b-b820-97b573723aab',
           from: fromNumber,
           to: { type: 'phone', number: to },
           tag,
           call_hook: {
-            url: `${appUrl}/jambonz/call-event`,
+            url: `${appUrl}/voicenimble/call-event`,
             method: 'POST',
           },
           call_status_hook: {
-            url: `${appUrl}/jambonz/call-status`,
+            url: `${appUrl}/voicenimble/call-status`,
             method: 'POST',
           },
         },

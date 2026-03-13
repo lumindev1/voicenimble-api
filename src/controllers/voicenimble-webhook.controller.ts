@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import { JambonzWebhookService } from '../services/jambonz-webhook.service';
+import { VoiceNimbleWebhookService } from '../services/voicenimble-webhook.service';
 
-const webhookService = new JambonzWebhookService();
+const webhookService = new VoiceNimbleWebhookService();
 
-export class JambonzWebhookController {
+export class VoiceNimbleWebhookController {
   async handleCallEvent(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const payload = { ...req.body, ...req.query };

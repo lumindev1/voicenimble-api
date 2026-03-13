@@ -3,6 +3,8 @@ import mongoose, { Document, Schema } from 'mongoose';
 export type VoiceGender = 'male' | 'female' | 'neutral';
 export type AgentLanguage = string;
 export type AgentCallType = 'inbound' | 'outbound';
+export type TtsVendor = 'google' | 'elevenlabs';
+export type SttVendor = 'google';
 
 export interface IAgent extends Document {
   _id: mongoose.Types.ObjectId;
@@ -16,10 +18,12 @@ export interface IAgent extends Document {
   voiceGender: VoiceGender;
   voiceId: string;
   voiceSpeed: number; // 0.5 - 2.0
+  ttsVendor: TtsVendor;
+  sttVendor: SttVendor;
 
   // Phone number
   phoneNumber?: string;
-  phoneNumberSid?: string; // Jambonz phone number SID
+  phoneNumberSid?: string; // VoiceNimble phone number SID
   bringYourOwnNumber: boolean;
   byonPhoneNumber?: string;
   countryCode: string;
@@ -42,9 +46,9 @@ export interface IAgent extends Document {
   isActive: boolean;
   isConfigured: boolean;
 
-  // Jambonz
-  jambonzApplicationId?: string;
-  jambonzCallRoutingRuleId?: string;
+  // VoiceNimble
+  voiceNimbleApplicationId?: string;
+  voiceNimbleCallRoutingRuleId?: string;
 
   createdAt: Date;
   updatedAt: Date;
@@ -61,6 +65,8 @@ const agentSchema = new Schema<IAgent>(
     voiceGender: { type: String, enum: ['male', 'female', 'neutral'], default: 'female' },
     voiceId: { type: String, default: 'en-US-Standard-F' },
     voiceSpeed: { type: Number, default: 1.0, min: 0.5, max: 2.0 },
+    ttsVendor: { type: String, enum: ['google', 'elevenlabs'], default: 'google' },
+    sttVendor: { type: String, enum: ['google'], default: 'google' },
 
     phoneNumber: { type: String },
     phoneNumberSid: { type: String },
@@ -89,8 +95,8 @@ const agentSchema = new Schema<IAgent>(
     isActive: { type: Boolean, default: false },
     isConfigured: { type: Boolean, default: false },
 
-    jambonzApplicationId: { type: String },
-    jambonzCallRoutingRuleId: { type: String },
+    voiceNimbleApplicationId: { type: String },
+    voiceNimbleCallRoutingRuleId: { type: String },
   },
   { timestamps: true },
 );

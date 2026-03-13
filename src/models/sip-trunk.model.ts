@@ -21,9 +21,9 @@ export interface ISipTrunk extends Document {
   callerIdNumber: string; // The number shown to recipients
   callerIdName?: string;
 
-  // Jambonz references (created via API)
-  jambonzCarrierSid?: string;
-  jambonzGatewaySid?: string;
+  // VoiceNimble references (created via API)
+  voiceNimbleCarrierSid?: string;
+  voiceNimbleGatewaySid?: string;
 
   // Status
   isActive: boolean;
@@ -53,8 +53,8 @@ const sipTrunkSchema = new Schema<ISipTrunk>(
     callerIdNumber: { type: String, required: true },
     callerIdName: { type: String },
 
-    jambonzCarrierSid: { type: String },
-    jambonzGatewaySid: { type: String },
+    voiceNimbleCarrierSid: { type: String },
+    voiceNimbleGatewaySid: { type: String },
 
     isActive: { type: Boolean, default: true },
     isDefault: { type: Boolean, default: false },
