@@ -113,12 +113,32 @@ export class VoiceNimbleWebhookService {
     let templateText: string | undefined;
     let greeting = agent.greetingMessage;
 
+    // For event-driven calls, build a professional greeting using customer name from order data
+    if (tagData.callType === 'event_driven' && tagData.orderContext) {
+      try {
+        const oc = typeof tagData.orderContext === 'string'
+          ? JSON.parse(tagData.orderContext)
+          : tagData.orderContext;
+        if (oc.customerName) {
+          greeting = `Hello, may I speak with ${oc.customerName} please? This is ${agent.agentName} calling from Voice Nimble.`;
+        }
+      } catch { /* use default greeting */ }
+    }
+
+    // Translate greeting if language is not English
+    const lang = agent.primaryLanguage || 'en-US';
+    if (!lang.startsWith('en')) {
+      greeting = await this.aiService.translateGreeting(greeting, lang);
+    }
+
     if (templateId) {
       const template = await CallTemplate.findById(templateId);
       if (template?.text) {
         templateText = template.text;
         // For static or AI-text templates, use template text as greeting if it's a short script
-        if (template.type === 'static' && template.text) {
+        // But NOT for event-driven calls — those use the agent's own greeting with order context
+        const isEventDriven = tagData.callType === 'event_driven';
+        if (template.type === 'static' && template.text && !isEventDriven) {
           greeting = template.text.split('\n')[0].slice(0, 300); // first line as greeting
         }
       }
@@ -191,9 +211,11 @@ export class VoiceNimbleWebhookService {
     const recognizerLang = agent.primaryLanguage || 'en-US';
     const sayVerb = this.voiceNimble.buildSayVerb(greeting, agent.voiceId, agent.ttsVendor || 'google', agent.voiceSpeed);
     logger.info(`JCML say verb: ${JSON.stringify(sayVerb)}`);
+    // Use longer timeout for outbound calls to give customer time to respond
+    const gatherTimeout = direction === 'outbound' ? 15 : 8;
     jcml.push(
       sayVerb,
-      this.voiceNimble.buildGatherVerb(gatherUrl, [], 8, recognizerLang, agent.sttVendor || 'google'),
+      this.voiceNimble.buildGatherVerb(gatherUrl, [], gatherTimeout, recognizerLang, agent.sttVendor || 'google'),
     );
 
     return jcml;

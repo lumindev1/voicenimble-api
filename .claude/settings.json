@@ -103,7 +103,17 @@
       "Bash(mongosh \"mongodb://VoiceNimble:plabon@ac-0ibfym8-shard-00-00.er9rkkw.mongodb.net:27017,ac-0ibfym8-shard-00-01.er9rkkw.mongodb.net:27017,ac-0ibfym8-shard-00-02.er9rkkw.mongodb.net:27017/voice-nimble?ssl=true&replicaSet=atlas-c36wnx-shard-0&authSource=admin&retryWrites=true&w=majority\" --quiet --eval 'db.agents.updateOne\\({_id: ObjectId\\(\"\"69b23f0cdca674edd5bbbd40\"\"\\)}, {$set: {ttsVendor: \"\"elevenlabs\"\", voiceId: \"\"EXAVITQu4vr4xnSDxMaL\"\"}}\\)')",
       "Bash(mongosh \"mongodb://VoiceNimble:plabon@ac-0ibfym8-shard-00-00.er9rkkw.mongodb.net:27017,ac-0ibfym8-shard-00-01.er9rkkw.mongodb.net:27017,ac-0ibfym8-shard-00-02.er9rkkw.mongodb.net:27017/voice-nimble?ssl=true&replicaSet=atlas-c36wnx-shard-0&authSource=admin&retryWrites=true&w=majority\" --quiet --eval 'db.agents.findOne\\({_id: ObjectId\\(\"\"69b23f0cdca674edd5bbbd40\"\"\\)}, {ttsVendor:1, voiceId:1, greetingMessage:1}\\)')",
       "Bash(git mv:*)",
-      "Bash(lsof -t -i:3001)"
+      "Bash(lsof -t -i:3001)",
+      "Bash(cat logs/*.log)",
+      "Bash(ls -la *.log)",
+      "Bash(grep -E \"\\\\.ts$\")",
+      "Bash(curl -s -X POST http://localhost:3001/api/test-call/event-driven -H 'Content-Type: application/json' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaG9wSWQiOiI2OWFmODdkZWNlNTAyNjA2MWQ3YmNiMzEiLCJzaG9wRG9tYWluIjoidm9pY2UtbmltYmxlLXRlc3QubXlzaG9waWZ5LmNvbSIsImlhdCI6MTc3MzQ1NTI2Nn0.tiLO8bfJyy2yVf66AeD8vXakf52xN_kpYuri1iFw45U' -d '{:*)",
+      "WebSearch",
+      "Bash(node -e \"require\\(''dotenv''\\).config\\(\\); console.log\\(process.env.APP_URL\\)\")",
+      "Bash(pkill -f ts-node.*src/index.ts)",
+      "Bash(pkill -f ts-node-dev.*src/index.ts)",
+      "Bash(pkill -9 -f ts-node-dev)",
+      "Bash(pkill -9 -f ts-node)"
     ],
     "additionalDirectories": [
       "/Users/luminouslabs/Desktop/project/voice-nimble/api/src",

@@ -288,6 +288,8 @@ export class VoiceNimbleService {
       actionHook: actionUrl,
       input: ['speech'],
       timeout,
+      speechTimeout: 3,
+      minBargeinWordCount: 1,
       recognizer: {
         vendor: sttVendor,
         language,
