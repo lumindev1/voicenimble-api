@@ -9,6 +9,32 @@ import { VoiceNimbleService } from './voicenimble.service';
 import { analyticsQueue, emailQueue } from '../jobs/queues';
 import logger from '../utils/logger';
 
+// Map short language codes to full Google STT locale codes
+const STT_LANGUAGE_MAP: Record<string, string> = {
+  'bn': 'bn-IN',
+  'en': 'en-US',
+  'hi': 'hi-IN',
+  'es': 'es-ES',
+  'fr': 'fr-FR',
+  'de': 'de-DE',
+  'ar': 'ar-SA',
+  'pt': 'pt-BR',
+  'ja': 'ja-JP',
+  'ko': 'ko-KR',
+  'zh': 'zh-CN',
+  'ta': 'ta-IN',
+  'te': 'te-IN',
+  'ur': 'ur-PK',
+};
+
+function resolveSTTLanguage(lang: string): string {
+  if (!lang) return 'en-US';
+  // Already a full locale (e.g. "en-US", "bn-IN")
+  if (lang.includes('-')) return lang;
+  // Map short code to full locale
+  return STT_LANGUAGE_MAP[lang] || `${lang}-${lang.toUpperCase()}`;
+}
+
 interface VoiceNimbleCallPayload {
   call_sid: string;
   call_status?: string;
@@ -208,7 +234,7 @@ export class VoiceNimbleWebhookService {
     }
 
     // Default: TTS greeting then gather
-    const recognizerLang = agent.primaryLanguage || 'en-US';
+    const recognizerLang = resolveSTTLanguage(agent.primaryLanguage || 'en-US');
     const sayVerb = this.voiceNimble.buildSayVerb(greeting, agent.voiceId, agent.ttsVendor || 'google', agent.voiceSpeed);
     logger.info(`JCML say verb: ${JSON.stringify(sayVerb)}`);
     // Use longer timeout for outbound calls to give customer time to respond
@@ -230,7 +256,7 @@ export class VoiceNimbleWebhookService {
     if (!userInput.trim()) {
       const state = await this.aiService.getConversationState(call_sid);
       const agent = state ? await Agent.findById(state.agentId) : null;
-      const lang = agent?.primaryLanguage || 'en-US';
+      const lang = resolveSTTLanguage(agent?.primaryLanguage || 'en-US');
       const gatherUrl = `${process.env.APP_URL}/voicenimble/gather-result?callSid=${call_sid}`;
       return [
         this.voiceNimble.buildSayVerb('I didn\'t catch that, could you please say that again?', agent?.voiceId || 'en-US-Wavenet-C', agent?.ttsVendor || 'google', agent?.voiceSpeed),
@@ -288,7 +314,7 @@ export class VoiceNimbleWebhookService {
     }
 
     // Continue conversation
-    const lang = agent?.primaryLanguage || 'en-US';
+    const lang = resolveSTTLanguage(agent?.primaryLanguage || 'en-US');
     const gatherUrl = `${process.env.APP_URL}/voicenimble/gather-result?callSid=${call_sid}`;
     return [
       this.voiceNimble.buildSayVerb(aiResponse.text, agent?.voiceId, agent?.ttsVendor || 'google', agent?.voiceSpeed),
