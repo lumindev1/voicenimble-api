@@ -116,7 +116,7 @@ export class WebhookController {
         shopDomain,
         configId: config._id.toString(),
         agentId: config.agentId?.toString(),
-        templateId: config.templateId.toString(),
+        templateId: config.templateId?.toString(),
         fromNumber: config.fromNumber,
         customerPhone,
         eventType: 'order_placed',
