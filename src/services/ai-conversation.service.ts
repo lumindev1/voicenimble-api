@@ -151,11 +151,8 @@ export class AIConversationService {
     const agent = await Agent.findById(state.agentId);
     if (!agent) return 'Hello! How can I help you today?';
 
-    // If language is not English, translate the greeting
-    const lang = agent.primaryLanguage || 'en-US';
-    if (!lang.startsWith('en')) {
-      return this.translateGreeting(agent.greetingMessage, lang);
-    }
+    // Return the greeting as-is — agent should already have greeting in their primary language
+    // This avoids a slow gpt-4o translation call on every call
     return agent.greetingMessage;
   }
 

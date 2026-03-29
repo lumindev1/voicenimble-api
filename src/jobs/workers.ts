@@ -132,7 +132,7 @@ async function processBroadcastJob(job: Job): Promise<void> {
       };
 
       if (sipTrunk?.voiceNimbleCarrierSid) {
-        callPayload.sip_trunk = sipTrunk.voiceNimbleCarrierSid;
+        callPayload.voip_carrier_sid = sipTrunk.voiceNimbleCarrierSid;
       }
 
       await axios.post(
@@ -225,7 +225,7 @@ async function processEventDrivenJob(job: Job): Promise<void> {
     };
 
     if (sipTrunk?.voiceNimbleCarrierSid) {
-      callPayload.sip_trunk = sipTrunk.voiceNimbleCarrierSid;
+      callPayload.voip_carrier_sid = sipTrunk.voiceNimbleCarrierSid;
     }
 
     await axios.post(

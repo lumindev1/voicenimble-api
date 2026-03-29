@@ -80,17 +80,25 @@ export class WebhookController {
         return;
       }
 
-      // Extract customer phone number
-      const customerPhone =
+      // Extract customer phone number and sanitize (remove spaces, dashes, parentheses)
+      const rawPhone =
         order.phone ||
         order.customer?.phone ||
         order.shipping_address?.phone ||
         order.billing_address?.phone;
 
-      if (!customerPhone) {
+      if (!rawPhone) {
         logger.warn(`Order ${order.name}: no customer phone number found, skipping auto-call`);
         res.status(200).send('OK');
         return;
+      }
+
+      // Remove spaces, dashes, parentheses, then convert +880 to 0 (BD local format)
+      let customerPhone = rawPhone.replace(/[\s\-\(\)]/g, '');
+      if (customerPhone.startsWith('+880')) {
+        customerPhone = '0' + customerPhone.slice(4);
+      } else if (customerPhone.startsWith('880')) {
+        customerPhone = '0' + customerPhone.slice(3);
       }
 
       // Build order context for AI
@@ -161,16 +169,23 @@ export class WebhookController {
         return;
       }
 
-      const customerPhone =
+      const rawFulfilledPhone =
         order.phone ||
         order.customer?.phone ||
         order.shipping_address?.phone ||
         order.billing_address?.phone;
 
-      if (!customerPhone) {
+      if (!rawFulfilledPhone) {
         logger.warn(`Order ${order.name} fulfilled: no customer phone, skipping auto-call`);
         res.status(200).send('OK');
         return;
+      }
+
+      let customerPhone = rawFulfilledPhone.replace(/[\s\-\(\)]/g, '');
+      if (customerPhone.startsWith('+880')) {
+        customerPhone = '0' + customerPhone.slice(4);
+      } else if (customerPhone.startsWith('880')) {
+        customerPhone = '0' + customerPhone.slice(3);
       }
 
       const orderContext = {

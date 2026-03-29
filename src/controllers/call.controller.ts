@@ -4,6 +4,7 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import Call from '../models/call.model';
 import CallTranscript from '../models/call-transcript.model';
 import Agent from '../models/agent.model';
+import SipTrunk from '../models/sip-trunk.model';
 import { AppError } from '../middlewares/error.middleware';
 
 export class CallController {
@@ -82,7 +83,8 @@ export class CallController {
       const apiKey = process.env.VOICENIMBLE_API_KEY!;
       const accountSid = process.env.VOICENIMBLE_ACCOUNT_SID!;
       const appUrl = process.env.APP_URL!;
-      const fromNumber = from || agent.byonPhoneNumber || agent.phoneNumber || process.env.DEFAULT_FROM_NUMBER || '01521206630';
+      const sipTrunk = await SipTrunk.findOne({ shopId: req.shopId, isDefault: true, isActive: true });
+      const fromNumber = from || sipTrunk?.callerIdNumber || agent.byonPhoneNumber || agent.phoneNumber || process.env.DEFAULT_FROM_NUMBER || '01521206630';
 
       const tag = {
         agentId: agent._id.toString(),
@@ -91,22 +93,29 @@ export class CallController {
         callType: 'outbound',
       };
 
+      const callPayload: Record<string, unknown> = {
+        application_sid: process.env.VOICENIMBLE_APPLICATION_SID || '7087fe50-8acb-4f3b-b820-97b573723aab',
+        from: fromNumber,
+        to: { type: 'phone', number: to },
+        tag,
+        call_hook: {
+          url: `${appUrl}/voicenimble/call-event`,
+          method: 'POST',
+        },
+        call_status_hook: {
+          url: `${appUrl}/voicenimble/call-status`,
+          method: 'POST',
+        },
+      };
+
+      // Route through merchant's SIP carrier if configured
+      if (sipTrunk?.voiceNimbleCarrierSid) {
+        callPayload.voip_carrier_sid = sipTrunk.voiceNimbleCarrierSid;
+      }
+
       const response = await axios.post(
         `${baseUrl}/v1/Accounts/${accountSid}/Calls`,
-        {
-          application_sid: process.env.VOICENIMBLE_APPLICATION_SID || '7087fe50-8acb-4f3b-b820-97b573723aab',
-          from: fromNumber,
-          to: { type: 'phone', number: to },
-          tag,
-          call_hook: {
-            url: `${appUrl}/voicenimble/call-event`,
-            method: 'POST',
-          },
-          call_status_hook: {
-            url: `${appUrl}/voicenimble/call-status`,
-            method: 'POST',
-          },
-        },
+        callPayload,
         { headers: { Authorization: `Bearer ${apiKey}` } },
       );
 

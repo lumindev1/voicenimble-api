@@ -53,21 +53,46 @@ export class TestCallController {
         call_status_hook: { url: `${appUrl}/voicenimble/call-status`, method: 'POST' },
       };
 
-      // Route through merchant's SIP trunk if configured
+      // Route through merchant's SIP carrier if configured
       if (sipTrunk?.voiceNimbleCarrierSid) {
-        callPayload.sip_trunk = sipTrunk.voiceNimbleCarrierSid;
+        callPayload.voip_carrier_sid = sipTrunk.voiceNimbleCarrierSid;
       }
 
       console.log('Test call payload:', JSON.stringify(callPayload, null, 2));
 
-      const response = await axios.post(
-        `${baseUrl}/v1/Accounts/${accountSid}/Calls`,
-        callPayload,
-        { headers: { Authorization: `Bearer ${apiKey}` } },
-      ).catch((err) => {
-        console.error('VoiceNimble call error:', err.response?.status, err.response?.data);
-        throw err;
-      });
+      let response;
+      try {
+        response = await axios.post(
+          `${baseUrl}/v1/Accounts/${accountSid}/Calls`,
+          callPayload,
+          { headers: { Authorization: `Bearer ${apiKey}` } },
+        );
+      } catch (err: any) {
+        // If the call failed with a carrier, retry without it (carrier may be stale/deleted)
+        if (callPayload.voip_carrier_sid) {
+          console.warn('Call failed with carrier, retrying without voip_carrier_sid...');
+          delete callPayload.voip_carrier_sid;
+          try {
+            response = await axios.post(
+              `${baseUrl}/v1/Accounts/${accountSid}/Calls`,
+              callPayload,
+              { headers: { Authorization: `Bearer ${apiKey}` } },
+            );
+          } catch (retryErr: any) {
+            const status = retryErr.response?.status;
+            const data = retryErr.response?.data;
+            console.error('VoiceNimble call error (retry):', status, JSON.stringify(data, null, 2));
+            const detail = data?.msg || data?.message || data?.error || `VoiceNimble API returned ${status}`;
+            throw new AppError(`Failed to initiate call: ${detail}`, status || 502);
+          }
+        } else {
+          const status = err.response?.status;
+          const data = err.response?.data;
+          console.error('VoiceNimble call error:', status, JSON.stringify(data, null, 2));
+          const detail = data?.msg || data?.message || data?.error || `VoiceNimble API returned ${status}`;
+          throw new AppError(`Failed to initiate call: ${detail}`, status || 502);
+        }
+      }
 
       res.json({ success: true, callSid: response.data.sid, message: 'Test call initiated' });
     } catch (error) {
@@ -161,19 +186,44 @@ export class TestCallController {
       };
 
       if (sipTrunk?.voiceNimbleCarrierSid) {
-        callPayload.sip_trunk = sipTrunk.voiceNimbleCarrierSid;
+        callPayload.voip_carrier_sid = sipTrunk.voiceNimbleCarrierSid;
       }
 
       console.log('Event-driven test call payload:', JSON.stringify(callPayload, null, 2));
 
-      const response = await axios.post(
-        `${baseUrl}/v1/Accounts/${accountSid}/Calls`,
-        callPayload,
-        { headers: { Authorization: `Bearer ${apiKey}` } },
-      ).catch((err) => {
-        console.error('VoiceNimble call error:', err.response?.status, err.response?.data);
-        throw err;
-      });
+      let response;
+      try {
+        response = await axios.post(
+          `${baseUrl}/v1/Accounts/${accountSid}/Calls`,
+          callPayload,
+          { headers: { Authorization: `Bearer ${apiKey}` } },
+        );
+      } catch (err: any) {
+        // If the call failed with a carrier, retry without it (carrier may be stale/deleted)
+        if (callPayload.voip_carrier_sid) {
+          console.warn('Event-driven call failed with carrier, retrying without voip_carrier_sid...');
+          delete callPayload.voip_carrier_sid;
+          try {
+            response = await axios.post(
+              `${baseUrl}/v1/Accounts/${accountSid}/Calls`,
+              callPayload,
+              { headers: { Authorization: `Bearer ${apiKey}` } },
+            );
+          } catch (retryErr: any) {
+            const status = retryErr.response?.status;
+            const data = retryErr.response?.data;
+            console.error('VoiceNimble call error (retry):', status, JSON.stringify(data, null, 2));
+            const detail = data?.msg || data?.message || data?.error || `VoiceNimble API returned ${status}`;
+            throw new AppError(`Failed to initiate call: ${detail}`, status || 502);
+          }
+        } else {
+          const status = err.response?.status;
+          const data = err.response?.data;
+          console.error('VoiceNimble call error:', status, JSON.stringify(data, null, 2));
+          const detail = data?.msg || data?.message || data?.error || `VoiceNimble API returned ${status}`;
+          throw new AppError(`Failed to initiate call: ${detail}`, status || 502);
+        }
+      }
 
       res.json({
         success: true,

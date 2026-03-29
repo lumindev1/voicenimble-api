@@ -143,8 +143,9 @@ export class AgentController {
 
   async getAvailableVoices(_req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const voices = [
-        // Google TTS voices
+      // Google TTS voices — all supported languages
+      const googleVoices = [
+        // English US
         { id: 'en-US-Standard-F', name: 'Standard F', language: 'en-US', gender: 'female', vendor: 'google' },
         { id: 'en-US-Standard-B', name: 'Standard B', language: 'en-US', gender: 'male', vendor: 'google' },
         { id: 'en-US-Standard-C', name: 'Standard C', language: 'en-US', gender: 'female', vendor: 'google' },
@@ -153,20 +154,60 @@ export class AgentController {
         { id: 'en-US-Neural2-D', name: 'Neural2 D', language: 'en-US', gender: 'male', vendor: 'google' },
         { id: 'en-US-Wavenet-F', name: 'WaveNet F', language: 'en-US', gender: 'female', vendor: 'google' },
         { id: 'en-US-Wavenet-D', name: 'WaveNet D', language: 'en-US', gender: 'male', vendor: 'google' },
+        // English UK
         { id: 'en-GB-Standard-A', name: 'GB Standard A', language: 'en-GB', gender: 'female', vendor: 'google' },
         { id: 'en-GB-Standard-B', name: 'GB Standard B', language: 'en-GB', gender: 'male', vendor: 'google' },
-        // ElevenLabs TTS voices
-        { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', language: 'en-US', gender: 'female', vendor: 'elevenlabs' },
-        { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', language: 'en-US', gender: 'male', vendor: 'elevenlabs' },
-        { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', language: 'en-US', gender: 'female', vendor: 'elevenlabs' },
-        { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', language: 'en-US', gender: 'female', vendor: 'elevenlabs' },
-        { id: 'bIHbv24MWmeRgasZH58o', name: 'Will', language: 'en-US', gender: 'male', vendor: 'elevenlabs' },
-        { id: 'cjVigY5qzO86Huf0OWal', name: 'Eric', language: 'en-US', gender: 'male', vendor: 'elevenlabs' },
-        { id: 'iP95p4xoKVk53GoZ742B', name: 'Chris', language: 'en-US', gender: 'male', vendor: 'elevenlabs' },
-        { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', language: 'en-US', gender: 'male', vendor: 'elevenlabs' },
-        { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', language: 'en-US', gender: 'female', vendor: 'elevenlabs' },
-        { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', language: 'en-GB', gender: 'male', vendor: 'elevenlabs' },
+        { id: 'en-GB-Wavenet-A', name: 'GB WaveNet A', language: 'en-GB', gender: 'female', vendor: 'google' },
+        { id: 'en-GB-Wavenet-B', name: 'GB WaveNet B', language: 'en-GB', gender: 'male', vendor: 'google' },
+        // Bengali
+        { id: 'bn-IN-Standard-A', name: 'Bengali Standard A', language: 'bn-IN', gender: 'female', vendor: 'google' },
+        { id: 'bn-IN-Standard-B', name: 'Bengali Standard B', language: 'bn-IN', gender: 'male', vendor: 'google' },
+        { id: 'bn-IN-Wavenet-A', name: 'Bengali WaveNet A', language: 'bn-IN', gender: 'female', vendor: 'google' },
+        { id: 'bn-IN-Wavenet-B', name: 'Bengali WaveNet B', language: 'bn-IN', gender: 'male', vendor: 'google' },
+        // Hindi
+        { id: 'hi-IN-Standard-A', name: 'Hindi Standard A', language: 'hi-IN', gender: 'female', vendor: 'google' },
+        { id: 'hi-IN-Standard-B', name: 'Hindi Standard B', language: 'hi-IN', gender: 'male', vendor: 'google' },
+        { id: 'hi-IN-Wavenet-A', name: 'Hindi WaveNet A', language: 'hi-IN', gender: 'female', vendor: 'google' },
+        { id: 'hi-IN-Wavenet-B', name: 'Hindi WaveNet B', language: 'hi-IN', gender: 'male', vendor: 'google' },
+        // Spanish
+        { id: 'es-ES-Standard-A', name: 'Spanish Standard A', language: 'es-ES', gender: 'female', vendor: 'google' },
+        { id: 'es-ES-Standard-B', name: 'Spanish Standard B', language: 'es-ES', gender: 'male', vendor: 'google' },
+        { id: 'es-ES-Wavenet-B', name: 'Spanish WaveNet B', language: 'es-ES', gender: 'male', vendor: 'google' },
+        // French
+        { id: 'fr-FR-Standard-A', name: 'French Standard A', language: 'fr-FR', gender: 'female', vendor: 'google' },
+        { id: 'fr-FR-Standard-B', name: 'French Standard B', language: 'fr-FR', gender: 'male', vendor: 'google' },
+        { id: 'fr-FR-Wavenet-A', name: 'French WaveNet A', language: 'fr-FR', gender: 'female', vendor: 'google' },
+        // German
+        { id: 'de-DE-Standard-A', name: 'German Standard A', language: 'de-DE', gender: 'female', vendor: 'google' },
+        { id: 'de-DE-Standard-B', name: 'German Standard B', language: 'de-DE', gender: 'male', vendor: 'google' },
+        { id: 'de-DE-Wavenet-A', name: 'German WaveNet A', language: 'de-DE', gender: 'female', vendor: 'google' },
       ];
+
+      // Fetch ElevenLabs voices dynamically from their API
+      let elevenLabsVoices: Array<{ id: string; name: string; language: string; gender: string; vendor: string }> = [];
+      try {
+        const axios = (await import('axios')).default;
+        const elResponse = await axios.get('https://api.elevenlabs.io/v1/voices', {
+          headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY! },
+          timeout: 5000,
+        });
+        elevenLabsVoices = (elResponse.data.voices || []).map((v: { voice_id: string; name: string; labels?: { gender?: string; accent?: string; language?: string } }) => ({
+          id: v.voice_id,
+          name: v.name,
+          language: v.labels?.language || v.labels?.accent || 'multilingual',
+          gender: v.labels?.gender || 'unknown',
+          vendor: 'elevenlabs',
+        }));
+      } catch {
+        // Fallback if ElevenLabs API fails
+        elevenLabsVoices = [
+          { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', language: 'en-US', gender: 'female', vendor: 'elevenlabs' },
+          { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', language: 'en-US', gender: 'male', vendor: 'elevenlabs' },
+          { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', language: 'en-US', gender: 'female', vendor: 'elevenlabs' },
+        ];
+      }
+
+      const voices = [...googleVoices, ...elevenLabsVoices];
       res.json({ success: true, voices });
     } catch (error) {
       next(error);

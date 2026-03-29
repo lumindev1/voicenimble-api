@@ -12,6 +12,8 @@ import logger from '../utils/logger';
 // Map short language codes to full Google STT locale codes
 const STT_LANGUAGE_MAP: Record<string, string> = {
   'bn': 'bn-IN',
+  'bn-BD': 'bn-BD',
+  'bn-IN': 'bn-IN',
   'en': 'en-US',
   'hi': 'hi-IN',
   'es': 'es-ES',
@@ -86,6 +88,14 @@ export class VoiceNimbleWebhookService {
     const templateId = templateIdFromQuery || tagData.templateId;
 
     logger.info(`Call event: ${call_sid} from ${from} to ${to}, agentId=${agentId}, direction=${callDirection}`);
+
+    if (!call_sid) {
+      logger.error('Missing call_sid in webhook payload — cannot process call');
+      return [
+        this.voiceNimble.buildSayVerb('Sorry, an error occurred processing this call.', 'en-US-Wavenet-C', 'google'),
+        { verb: 'hangup' },
+      ];
+    }
 
     // Resolve agent: outbound passes agentId, inbound looks up by phone number, fallback to any active
     let agent;
@@ -326,6 +336,11 @@ export class VoiceNimbleWebhookService {
     const { call_sid, call_status, duration, to, from } = payload;
     logger.info(`Call status update [${call_sid}]: ${call_status}, duration: ${duration}s, from: ${from}, to: ${to}`);
 
+    if (!call_sid) {
+      logger.warn('Ignoring call status update with missing call_sid');
+      return;
+    }
+
     if (call_status === 'completed' || call_status === 'failed' || call_status === 'no-answer' || call_status === 'busy' || call_status === 'canceled') {
       let call = await Call.findOneAndUpdate(
         { callSid: call_sid },
@@ -391,6 +406,10 @@ export class VoiceNimbleWebhookService {
   async handleRecordingComplete(payload: Record<string, string>): Promise<void> {
     const { callSid, RecordingUrl, RecordingDuration, RecordingSid } = payload;
     logger.info(`Recording complete for call: ${callSid}`);
+    if (!callSid) {
+      logger.warn('Ignoring recording status with missing callSid');
+      return;
+    }
     await Call.findOneAndUpdate(
       { callSid },
       {

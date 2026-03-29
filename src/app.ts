@@ -24,6 +24,7 @@ import broadcastRoutes from './routes/broadcast.routes';
 import eventDrivenRoutes from './routes/event-driven.routes';
 import testCallRoutes from './routes/test-call.routes';
 import sipTrunkRoutes from './routes/sip-trunk.routes';
+import phoneProviderRoutes from './routes/phone-provider.routes';
 
 import { errorHandler } from './middlewares/error.middleware';
 import logger from './utils/logger';
@@ -103,6 +104,7 @@ app.use('/api/broadcast', broadcastRoutes);
 app.use('/api/event-driven', eventDrivenRoutes);
 app.use('/api/test-call', testCallRoutes);
 app.use('/api/sip-trunks', sipTrunkRoutes);
+app.use('/api/phone-providers', phoneProviderRoutes);
 app.use('/webhooks', webhookRoutes);
 app.use('/voicenimble', voiceNimbleRoutes);
 
